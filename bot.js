@@ -202,31 +202,32 @@ async function connectToWhatsApp() {
                         }
                         break;
                     case '!help':
-                            await reply({
-                                text: `📖 *COMANDOS DISPONÍVEIS* 📖
+                        const textoHelp = `📖 *COMANDOS DISPONÍVEIS* 📖
 
-                        🔹 *BÁSICOS* (todos podem usar)
-                        • !ping — Testa se o bot está ativo
-                        • !perdi / !menosuma — Contadores personalizados
-                        • !dado XdY — Rola dados (ex: !3d6)
-                        • !s — Cria figurinha a partir de imagem
-                        • !sorteio N — Sorteia N pessoas no grupo
-                        • !cargo — Mostra seu cargo atual
-                        • !ranks — Exibe os cargos e permissões
+                    *🔹 BÁSICOS* — Todos podem usar
+                    - !ping → Testa se o bot está ativo
+                    - !perdi / !menosuma → Contadores personalizados
+                    - !dado XdY → Rola dados (ex: !3d6)
+                    - !s → Gera figurinha a partir de imagem
+                    - !sorteio N → Sorteia N pessoas do grupo
+                    - !cargo → Mostra seu cargo atual
+                    - !ranks → Exibe hierarquia e permissões
 
-                        🔸 *ADMINISTRATIVOS* (por hierarquia)
-                        • !addcargo @usuário <cargo>
-                        • !removecargo @usuário
-                        • !ban @usuário
-                        • !bloquear @usuário
-                        • !listarcargos — Exibe lista de usuários com cargo
+                    *🔸 ADMINISTRATIVOS* — Dependem do seu cargo
+                    - !addcargo @usuário <cargo> → Promove
+                    - !removecargo @usuário → Remove cargo
+                    - !ban @usuário → Remove do grupo
+                    - !bloquear @usuário → Bloqueia ou desbloqueia usuário
+                    - !listarcargos → Lista usuários com cargo
 
-                        📞 *Ajuda e suporte*
-                        • !contato — Contato com o dono do bot
+                    *📞 SUPORTE*
+                    - !contato → Fale com o dono do bot
 
-                        ℹ️ Use *!ranks* para saber o que cada cargo pode fazer.`
-                            });
-                            break;
+                    ℹ️ Use *!ranks* para ver o que cada patente pode fazer.`;
+                        
+                        await reply({ text: textoHelp });
+                        break;
+
                     case '!perdi':
                         if (jid.endsWith('@g.us')) {
                             const currentCount = await incrementCounter('perdi');
