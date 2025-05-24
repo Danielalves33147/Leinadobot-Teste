@@ -202,28 +202,29 @@ async function connectToWhatsApp() {
                         }
                         break;
                     case '!help':
-                        const textoHelp = `📖 *COMANDOS DISPONÍVEIS* 📖
+                        const textoHelp = `🤖 *COMANDOS DISPONÍVEIS* 🤖
 
-                    *🔹 BÁSICOS* — Todos podem usar
-                    - !ping → Testa se o bot está ativo
-                    - !perdi / !menosuma → Contadores personalizados
-                    - !dado XdY → Rola dados (ex: !3d6)
-                    - !s → Gera figurinha a partir de imagem
-                    - !sorteio N → Sorteia N pessoas do grupo
-                    - !cargo → Mostra seu cargo atual
-                    - !ranks → Exibe hierarquia e permissões
+                        🔹 *BÁSICOS* (todos podem usar)
+                        • !ping — Testa se o bot está ativo
+                        • !perdi / !menosuma — Contadores personalizados
+                        • !dado XdY — Rola dados (ex: !3d6)
+                        • !s — Gera figurinha de imagem
+                        • !sorteio N — Sorteia N pessoas do grupo
+                        • !cargo — Mostra seu cargo atual
+                        • !ranks — Exibe cargos e permissões
 
-                    *🔸 ADMINISTRATIVOS* — Dependem do seu cargo
-                    - !addcargo @usuário <cargo> → Promove
-                    - !removecargo @usuário → Remove cargo
-                    - !ban @usuário → Remove do grupo
-                    - !bloquear @usuário → Bloqueia ou desbloqueia usuário
-                    - !listarcargos → Lista usuários com cargo
+                        🔸 *ADMINISTRATIVOS* (por cargo)
+                        • !addcargo @usuário <cargo>
+                        • !removecargo @usuário
+                        • !ban @usuário
+                        • !bloquear @usuário
+                        • !listarcargos
 
-                    *📞 SUPORTE*
-                    - !contato → Fale com o dono do bot
+                        📞 *Ajuda ou sugestões*
+                        • !contato — Fale com o dono do bot
 
-                    ℹ️ Use *!ranks* para ver o que cada patente pode fazer.`;
+                        ℹ️ Use *!ranks* para ver o que cada cargo pode fazer`;
+
                         
                         await reply({ text: textoHelp });
                         break;
@@ -512,29 +513,30 @@ async function connectToWhatsApp() {
                     case '!ranks':
                         const textoRanks = `📜 *CARGOS & HIERARQUIA* 📜
 
-                    *🔹 Recruta*
-                    - Comandos: !ping, !perdi, !menosuma, !dado, !s
-                    - Sem permissões administrativas.
+                        🔹 *Recruta*
+                        - Comandos: !ping, !perdi, !menosuma, !dado, !s
+                        - Sem permissões administrativas
 
-                    *🔸 Capitão*
-                    - Comandos: !all, !sorteio
-                    - Pode usar !listarcargos
+                        🔸 *Capitão*
+                        - Comandos: !all, !sorteio
+                        - Pode usar !listarcargos
 
-                    *🔸 General*
-                    - Pode usar !ban
-                    - Pode promover até *Capitão*
-                    - Pode usar !removecargo
+                        🔸 *General*
+                        - Pode usar !ban
+                        - Pode promover até *Capitão*
+                        - Pode usar !removecargo
 
-                    *🔸 Comandante*
-                    - Pode promover até *General*
-                    - Acesso total aos comandos administrativos
+                        🔸 *Comandante*
+                        - Pode promover até *General*
+                        - Acesso total aos comandos administrativos
 
-                    *🔸 Imperador*
-                    - Pode promover até *Comandante*
-                    - Controle total sobre o sistema de patentes
-                    - Pode usar !bloquear
+                        🔸 *Imperador*
+                        - Pode promover até *Comandante*
+                        - Controle total sobre o sistema de patentes
+                        - Pode usar !bloquear
 
-                    ❗ Use *!cargo* para ver seu nível atual.`;
+                        ❗ Use *!cargo* para ver seu nível atual.`;
+
 
                         await reply({ text: textoRanks });
                         break;
