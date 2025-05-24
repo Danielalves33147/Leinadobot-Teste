@@ -190,7 +190,7 @@ async function connectToWhatsApp() {
                 console.log('Comando recebido:', text);
                 const [command, ...args] = text.split(' '); // args é definido AQUI
                 const lowerCommand = command.toLowerCase();
-                await logCommand(lowerCommand); // Logar o comando           
+               // await logCommand(lowerCommand); // Logar o comando           
                 const reply = (msg) => sock.sendMessage(jid, msg);
                 switch (lowerCommand) {
                     case '!ping':
