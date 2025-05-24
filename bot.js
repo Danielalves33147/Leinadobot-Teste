@@ -202,28 +202,27 @@ async function connectToWhatsApp() {
                         }
                         break;
                     case '!help':
-                        const textoHelp = `🤖 *COMANDOS DISPONÍVEIS* 🤖
+                    const textoHelp = `🤖 *COMANDOS DISPONÍVEIS* 🤖
 
-                        🔹 *BÁSICOS* (todos podem usar)
-                        • !ping — Testa se o bot está ativo
-                        • !perdi / !menosuma — Contadores personalizados
-                        • !dado XdY — Rola dados (ex: !3d6)
-                        • !s — Gera figurinha de imagem
-                        • !sorteio N — Sorteia N pessoas do grupo
-                        • !cargo — Mostra seu cargo atual
-                        • !ranks — Exibe cargos e permissões
+                    *BÁSICOS*
+                    !ping — Testa se o bot está ativo
+                    !perdi / !menosuma — Contadores personalizados
+                    !dado XdY — Rola dados (ex: !3d6)
+                    !s — Gera figurinha de imagem
+                    !sorteio N — Sorteia N pessoas do grupo
+                    !cargo — Mostra seu cargo atual
+                    !ranks — Exibe cargos e permissões
 
-                        🔸 *ADMINISTRATIVOS* (por cargo)
-                        • !addcargo @usuário <cargo>
-                        • !removecargo @usuário
-                        • !ban @usuário
-                        • !bloquear @usuário
-                        • !listarcargos
+                    *ADMINISTRATIVOS*
+                    !addcargo @usuário <cargo>
+                    !removecargo @usuário
+                    !ban @usuário
+                    !bloquear @usuário
+                    !listarcargos
 
-                        📞 *Ajuda ou sugestões*
-                        • !contato — Fale com o dono do bot
+                    Ajuda: use !contato
+                    ℹ️ Veja o que cada cargo pode usar com !ranks`;
 
-                        ℹ️ Use *!ranks* para ver o que cada cargo pode fazer`;
 
                         
                         await reply({ text: textoHelp });
@@ -511,31 +510,32 @@ async function connectToWhatsApp() {
                         }
                         break;
                     case '!ranks':
-                        const textoRanks = `📜 *CARGOS & HIERARQUIA* 📜
+                    const textoRanks = `📜 *CARGOS & HIERARQUIA* 📜
 
-                        🔹 *Recruta*
-                        - Comandos: !ping, !perdi, !menosuma, !dado, !s
-                        - Sem permissões administrativas
+                    🔹 *Recruta*
+                    Comandos: !ping, !perdi, !menosuma, !dado, !s
+                    Sem permissões administrativas
 
-                        🔸 *Capitão*
-                        - Comandos: !all, !sorteio
-                        - Pode usar !listarcargos
+                    🔸 *Capitão*
+                    Comandos: !all, !sorteio
+                    Pode usar !listarcargos
 
-                        🔸 *General*
-                        - Pode usar !ban
-                        - Pode promover até *Capitão*
-                        - Pode usar !removecargo
+                    🔸 *General*
+                    Pode usar !ban
+                    Pode promover até Capitão
+                    Pode usar !removecargo
 
-                        🔸 *Comandante*
-                        - Pode promover até *General*
-                        - Acesso total aos comandos administrativos
+                    🔸 *Comandante*
+                    Pode promover até General
+                    Acesso total aos comandos administrativos
 
-                        🔸 *Imperador*
-                        - Pode promover até *Comandante*
-                        - Controle total sobre o sistema de patentes
-                        - Pode usar !bloquear
+                    🔸 *Imperador*
+                    Pode promover até Comandante
+                    Controle total sobre o sistema de patentes
+                    Pode usar !bloquear
 
-                        ❗ Use *!cargo* para ver seu nível atual.`;
+                    Use !cargo para ver seu nível atual`;
+
 
 
                         await reply({ text: textoRanks });
