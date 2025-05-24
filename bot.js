@@ -29,7 +29,7 @@ const roles = {
 const { Client } = require('pg');
 
 const dbConfig = {
-    user: 'postgres',
+    user: 'daniel',
     host: 'localhost',
     database: 'santana',
     password: '1475',
