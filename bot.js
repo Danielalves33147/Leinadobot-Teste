@@ -194,8 +194,14 @@ async function connectToWhatsApp() {
                 const reply = (msg) => sock.sendMessage(jid, msg);
                 switch (lowerCommand) {
                     case '!ping':
-                        await sock.sendMessage(jid, { text: '🏓 Pong!' });
+                        try {
+                            await sock.sendMessage(jid, { text: '🏓 Pong!' });
+                            console.log('✅ Pong enviado com sucesso.');
+                        } catch (err) {
+                            console.error('❌ Erro ao enviar Pong:', err);
+                        }
                         break;
+
                     case '!help':
                     await reply({
                         text: `🤖 *COMANDOS DISPONÍVEIS* 🤖
