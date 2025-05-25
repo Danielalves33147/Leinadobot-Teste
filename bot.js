@@ -38,15 +38,25 @@ const dbConfig = {
 
 const dbClient = new Client(dbConfig);
 
-// Função para conectar ao banco de dados
+// Função para conectar ao banco de dados e testar a tabela 'users'
 async function connectDB() {
     try {
+        if (dbClient._connected) {
+            console.log('⚠️ Conexão com o banco já está ativa.');
+            return;
+        }
+
         await dbClient.connect();
-        console.log('Conectado ao banco de dados PostgreSQL');
+        console.log('✅ Conectado ao banco de dados PostgreSQL');
+
+        // Testa se a tabela 'users' pode ser acessada
+        const res = await dbClient.query('SELECT user_id FROM users LIMIT 1');
+        console.log('📦 Teste de leitura da tabela users bem-sucedido:', res.rows.length, 'registro(s) encontrados.');
     } catch (err) {
-        console.error('Erro ao conectar ao banco de dados:', err);
+        console.error('❌ Erro ao conectar ou ler a tabela users:', err.message || err);
     }
 }
+
 
 connectDB();
 
