@@ -319,7 +319,7 @@ case '!ban':
         }
 
         const targetUserId = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-        console.log('Usuário alvo corrigido:', targetUserId);
+        console.log('Usuário alvo corrigido: aaaaaaaaaaaaaaaaaaaaaaaaaa', targetUserId);
 
         const senderRole = await getUserRoleFromDatabase(senderJid);
 
