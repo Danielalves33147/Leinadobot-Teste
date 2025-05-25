@@ -322,8 +322,8 @@ case '!ban':
             return;
         }
 
-        const cleanNumber = args[0].replace(/[@\s]/g, '').replace('s.whatsapp.net', '');
-        const targetUserId = `${cleanNumber}@s.whatsapp.net`;
+        const targetUserId = args[0].replace('@', '').replace('@s.whatsapp.net', '') + '@s.whatsapp.net';
+
         const senderRole = await getUserRoleFromDatabase(senderJid);
         const targetUserRole = await getUserRoleFromDatabase(targetUserId);
 
