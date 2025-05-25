@@ -308,6 +308,9 @@ case '!all':
 
 
 case '!ban':
+    console.log('🔍 Entrou no case !ban');
+console.log('args:', args);
+
     try {
         if (!jid.endsWith('@g.us')) {
             await sock.sendMessage(jid, { text: '⚠️ O comando !ban só pode ser usado em grupos.' });
