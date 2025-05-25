@@ -309,7 +309,7 @@ case '!all':
 
 case '!ban':
     console.log('🔍 Entrou no case !ban');
-console.log('args:', args);
+    console.log('args:', args);
 
     try {
         if (!jid.endsWith('@g.us')) {
@@ -322,7 +322,8 @@ console.log('args:', args);
             return;
         }
 
-        const targetUserId = args[0].slice(1) + '@s.whatsapp.net';
+        const cleanNumber = args[0].replace(/[@\s]/g, '').replace('s.whatsapp.net', '');
+        const targetUserId = `${cleanNumber}@s.whatsapp.net`;
         const senderRole = await getUserRoleFromDatabase(senderJid);
         const targetUserRole = await getUserRoleFromDatabase(targetUserId);
 
