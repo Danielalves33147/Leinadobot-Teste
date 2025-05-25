@@ -110,7 +110,7 @@ async function connectToWhatsApp() {
 
 async function getUserRoleFromDatabase(userId) {
     try {
-        console.log('🔍 Buscando cargo de:', userId);
+        //console.log('🔍 Buscando cargo de:', userId);
 
         const result = await dbClient.query(
             'SELECT role FROM users WHERE user_id = $1',
@@ -118,7 +118,7 @@ async function getUserRoleFromDatabase(userId) {
         );
 
         if (result.rows.length === 0) {
-            console.warn(`⚠️ Usuário ${userId} não encontrado. Cadastrando como "Recruta".`);
+           // console.warn(`⚠️ Usuário ${userId} não encontrado. Cadastrando como "Recruta".`);
 
             await dbClient.query(
                 'INSERT INTO users (user_id, number, role) VALUES ($1, $2, $3)',
@@ -129,7 +129,7 @@ async function getUserRoleFromDatabase(userId) {
         }
 
         const role = result.rows[0].role || 'Recruta';
-        console.log(`✅ Cargo encontrado para ${userId}: ${role}`);
+        //console.log(`✅ Cargo encontrado para ${userId}: ${role}`);
         return role;
 
     } catch (error) {
@@ -144,7 +144,7 @@ async function getUserRoleFromDatabase(userId) {
                         'INSERT INTO logs (user_id, user_number, chat_id, command) VALUES ($1, $2, $3, $4)',
                         [senderJid, senderNumber, jid, commandUsed]
                     );
-                    console.log(`Comando "${commandUsed}" logado no banco de dados.`);
+                  //  console.log(`Comando "${commandUsed}" logado no banco de dados.`);
                 } catch (error) {
                     console.error('Erro ao logar comando:', error);
                 }
@@ -224,7 +224,7 @@ async function getUserRoleFromDatabase(userId) {
                     case '!ping':
                         try {
                             await sock.sendMessage(jid, { text: '🏓 Pong!' });
-                            console.log('✅ Pong enviado com sucesso.');
+                           // console.log('✅ Pong enviado com sucesso.');
                         } catch (err) {
                             console.error('❌ Erro ao enviar Pong:', err);
                         }
@@ -329,11 +329,6 @@ case '!all':
     }
     break;
 
-
-
-
-
-
 case '!ban':
     try {
         if (!jid.endsWith('@g.us')) {
@@ -347,45 +342,28 @@ case '!ban':
         }
 
         const targetUserId = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-        console.log('Usuário alvo corrigido: aaaaaaaaaaaaaaaaaaaaaaaaaa', targetUserId);
 
         const senderRole = await getUserRoleFromDatabase(senderJid);
 
-         console.log('ANTES DOS IFS 111111');
-
         const targetUserRole = await getUserRoleFromDatabase(targetUserId);
 
-            console.log('ANTES DOS IFS');
 
 
         if (!senderRole) {
             await sock.sendMessage(jid, { text: '❌ Seu cargo não foi encontrado no sistema.' });
-
-                    console.log('SENDER ROLE');
-
             return;
         }
 
         if (!isRoleAuthorized(senderRole, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRole)) {
             await sock.sendMessage(jid, { text: '❌ Você não tem permissão para banir este usuário.' });
-
-
-                                console.log('ROLE AUTORIZED');
-
             return;
         }
 
         const groupParticipants = await getAllGroupParticipants(jid);
         if (!groupParticipants.includes(targetUserId)) {
             await sock.sendMessage(jid, { text: '❌ Este usuário não está no grupo.' });
-
-                                console.log('GROUP PARTICIPANTS');
-
             return;
         }
-
-        console.log('Participantes do grupo:', await getAllGroupParticipants(jid));
-    console.log('Tentando remover:', targetUserId);
 
 
         await sock.groupParticipantsUpdate(jid, [targetUserId], 'remove');
@@ -396,17 +374,6 @@ case '!ban':
         await sock.sendMessage(jid, { text: '❌ Erro ao tentar banir o usuário.' });
     }
     break;
-
-
-
-
-
-
-
-
-
-
-
 
 case '!addcargo':
     try {
