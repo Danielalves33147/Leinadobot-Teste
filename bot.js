@@ -326,22 +326,32 @@ case '!ban':
 
         if (!senderRole) {
             await sock.sendMessage(jid, { text: '❌ Seu cargo não foi encontrado no sistema.' });
+
+                    console.log('SENDER ROLE');
+
             return;
         }
 
         if (!isRoleAuthorized(senderRole, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRole)) {
             await sock.sendMessage(jid, { text: '❌ Você não tem permissão para banir este usuário.' });
+
+
+                                console.log('ROLE AUTORIZED');
+
             return;
         }
 
         const groupParticipants = await getAllGroupParticipants(jid);
         if (!groupParticipants.includes(targetUserId)) {
             await sock.sendMessage(jid, { text: '❌ Este usuário não está no grupo.' });
+
+                                console.log('GROUP PARTICIPANTS');
+
             return;
         }
 
         console.log('Participantes do grupo:', await getAllGroupParticipants(jid));
-        console.log('Tentando remover:', targetUserId);
+    console.log('Tentando remover:', targetUserId);
 
 
         await sock.groupParticipantsUpdate(jid, [targetUserId], 'remove');
