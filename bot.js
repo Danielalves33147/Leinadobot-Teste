@@ -301,35 +301,65 @@ case '!all':
     }
     break;
 
+
+
+
+
+
+
 case '!ban':
     try {
         if (!jid.endsWith('@g.us')) {
             await sock.sendMessage(jid, { text: '⚠️ O comando !ban só pode ser usado em grupos.' });
-            break;
+            return;
         }
 
         if (args.length === 0 || !args[0].startsWith('@')) {
-            await sock.sendMessage(jid, { text: 'Uso correto: !ban @usuario' });
-            break;
+            await sock.sendMessage(jid, { text: '❌ Uso correto: !ban @usuario' });
+            return;
         }
 
         const targetUserId = args[0].slice(1) + '@s.whatsapp.net';
         const senderRole = await getUserRoleFromDatabase(senderJid);
         const targetUserRole = await getUserRoleFromDatabase(targetUserId);
 
+        if (!senderRole) {
+            await sock.sendMessage(jid, { text: '❌ Seu cargo não foi encontrado no sistema.' });
+            return;
+        }
+
+        if (!targetUserRole) {
+            await sock.sendMessage(jid, { text: `⚠️ O usuário ${args[0]} ainda não possui um cargo registrado. Considerado como Recruta.` });
+        }
+
         if (!isRoleAuthorized(senderRole, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRole)) {
             await sock.sendMessage(jid, { text: '❌ Você não tem permissão para banir este usuário.' });
-            break;
+            return;
+        }
+
+        // Verificar se o usuário está no grupo
+        const groupParticipants = await getAllGroupParticipants(jid);
+        if (!groupParticipants.includes(targetUserId)) {
+            await sock.sendMessage(jid, { text: '❌ Este usuário não está no grupo.' });
+            return;
         }
 
         await sock.groupParticipantsUpdate(jid, [targetUserId], 'remove');
-        await sock.sendMessage(jid, { text: `✅ Usuário ${args[0]} removido do grupo.` });
+        await sock.sendMessage(jid, { text: `✅ Usuário ${args[0]} removido com sucesso.` });
 
-    } catch (error) {
-        console.error('Erro no comando !ban:', error);
-        await sock.sendMessage(jid, { text: '❌ Falha ao tentar banir o usuário.' });
+    } catch (err) {
+        console.error('Erro no comando !ban:', err);
+        await sock.sendMessage(jid, { text: '❌ Erro ao tentar banir o usuário.' });
     }
     break;
+
+
+
+
+
+
+
+
 
 case '!addcargo':
     try {
