@@ -322,8 +322,9 @@ case '!ban':
             return;
         }
 
-        const cleanNumber = args[0].replace(/[@\s]/g, '').replace('s.whatsapp.net', '');
-        const targetUserId = `${cleanNumber}@s.whatsapp.net`;
+        // Remove arroba, espaços e sufixos extras
+        const numeroLimpo = args[0].replace(/[@\s]/g, '').replace(/[^0-9]/g, '');
+        const targetUserId = `${numeroLimpo}@s.whatsapp.net`;
         console.log('🎯 Usuário alvo:', targetUserId);
 
         const senderRole = await getUserRoleFromDatabase(senderJid);
@@ -363,6 +364,7 @@ case '!ban':
         await sock.sendMessage(jid, { text: '❌ Erro ao tentar banir o usuário.' });
     }
     break;
+
 
 
 
