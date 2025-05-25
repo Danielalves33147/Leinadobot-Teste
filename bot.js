@@ -308,62 +308,47 @@ case '!all':
 
 case '!ban':
     try {
-        console.log('🔍 Entrou no case !ban');
-
         if (!jid.endsWith('@g.us')) {
-            console.log('⛔ Não é grupo');
             await sock.sendMessage(jid, { text: '⚠️ O comando !ban só pode ser usado em grupos.' });
             return;
         }
 
         if (args.length === 0 || !args[0].startsWith('@')) {
-            console.log('⛔ Sem @ no argumento');
             await sock.sendMessage(jid, { text: '❌ Uso correto: !ban @usuario' });
             return;
         }
 
-        // Remove arroba, espaços e sufixos extras
-        const numeroLimpo = args[0].replace(/[@\s]/g, '').replace(/[^0-9]/g, '');
-        const targetUserId = `${numeroLimpo}@s.whatsapp.net`;
-        console.log('🎯 Usuário alvo:', targetUserId);
+        const targetUserId = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        console.log('Usuário alvo corrigido:', targetUserId);
 
         const senderRole = await getUserRoleFromDatabase(senderJid);
-        console.log('📌 Cargo do remetente:', senderRole);
-
         const targetUserRole = await getUserRoleFromDatabase(targetUserId);
-        console.log('📌 Cargo do alvo:', targetUserRole || '(não encontrado, tratando como Recruta)');
 
         if (!senderRole) {
-            console.log('⛔ Cargo do remetente não encontrado');
             await sock.sendMessage(jid, { text: '❌ Seu cargo não foi encontrado no sistema.' });
             return;
         }
 
         if (!isRoleAuthorized(senderRole, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRole)) {
-            console.log('⛔ Cargo sem permissão');
             await sock.sendMessage(jid, { text: '❌ Você não tem permissão para banir este usuário.' });
             return;
         }
 
         const groupParticipants = await getAllGroupParticipants(jid);
-        console.log('👥 Participantes do grupo carregados');
-
         if (!groupParticipants.includes(targetUserId)) {
-            console.log('⛔ Usuário não está no grupo');
             await sock.sendMessage(jid, { text: '❌ Este usuário não está no grupo.' });
             return;
         }
 
-        console.log('🔨 Banindo...');
         await sock.groupParticipantsUpdate(jid, [targetUserId], 'remove');
-        console.log('✅ Banimento executado');
         await sock.sendMessage(jid, { text: `✅ Usuário ${args[0]} removido com sucesso.` });
 
     } catch (err) {
-        console.error('❌ Erro no comando !ban:', err);
+        console.error('Erro no comando !ban:', err);
         await sock.sendMessage(jid, { text: '❌ Erro ao tentar banir o usuário.' });
     }
     break;
+
 
 
 
