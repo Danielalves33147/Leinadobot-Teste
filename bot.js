@@ -324,6 +324,9 @@ case '!ban':
         const senderRole = await getUserRoleFromDatabase(senderJid);
         const targetUserRole = await getUserRoleFromDatabase(targetUserId);
 
+            console.log('ANTES DOS IFS');
+
+
         if (!senderRole) {
             await sock.sendMessage(jid, { text: '❌ Seu cargo não foi encontrado no sistema.' });
 
