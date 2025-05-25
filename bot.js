@@ -98,18 +98,36 @@ async function connectToWhatsApp() {
 
             // --- FUNÇÕES AUXILIARES (declaradas dentro do escopo para acesso a sock, dbClient, etc.) ---
 
-            async function getUserRoleFromDatabase(userId) {
-                try {
-                    const result = await dbClient.query(
-                        'SELECT role FROM users WHERE user_id = $1',
-                        [userId]
-                    );
-                    return result.rows[0]?.role;
-                } catch (error) {
-                    console.error('Erro ao buscar cargo do usuário no banco:', error);
-                    return 'Recruta'; // Padrão se não encontrar ou erro
-                }
-            }
+async function getUserRoleFromDatabase(userId) {
+    try {
+        console.log('🔍 Buscando cargo de:', userId);
+
+        const result = await dbClient.query(
+            'SELECT role FROM users WHERE user_id = $1',
+            [userId]
+        );
+
+        if (result.rows.length === 0) {
+            console.warn(`⚠️ Usuário ${userId} não encontrado. Cadastrando como "Recruta".`);
+
+            await dbClient.query(
+                'INSERT INTO users (user_id, number, role) VALUES ($1, $2, $3)',
+                [userId, userId.split('@')[0], 'Recruta']
+            );
+
+            return 'Recruta';
+        }
+
+        const role = result.rows[0].role || 'Recruta';
+        console.log(`✅ Cargo encontrado para ${userId}: ${role}`);
+        return role;
+
+    } catch (error) {
+        console.error('❌ Erro ao buscar ou cadastrar usuário:', error);
+        return 'Recruta';
+    }
+}
+
             async function logCommand(commandUsed) {
                 try {
                     await dbClient.query(
