@@ -322,6 +322,9 @@ case '!ban':
         console.log('Usuário alvo corrigido:', targetUserId);
 
         const senderRole = await getUserRoleFromDatabase(senderJid);
+
+         console.log('ANTES DOS IFS 111111');
+
         const targetUserRole = await getUserRoleFromDatabase(targetUserId);
 
             console.log('ANTES DOS IFS');
