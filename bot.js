@@ -340,6 +340,10 @@ case '!ban':
             return;
         }
 
+        console.log('Participantes do grupo:', await getAllGroupParticipants(jid));
+        console.log('Tentando remover:', targetUserId);
+
+
         await sock.groupParticipantsUpdate(jid, [targetUserId], 'remove');
         await sock.sendMessage(jid, { text: `✅ Usuário ${args[0]} removido com sucesso.` });
 
