@@ -717,6 +717,35 @@ case '!cargo':
     }
     break;
 
+case '!inicio':
+        try {
+        const texto = `👋 *Seja bem-vindo(a)!*
+
+📌 Este bot ajuda na organização do grupo e oferece comandos úteis.
+
+🧩 *Comandos básicos:*
+- !ping — Verifica se estou online
+- !perdi / !menosuma — Contadores divertidos
+- !dado XdY — Role dados (ex: !3d6)
+- !s — Transforme imagens em figurinhas
+
+🔐 *Hierarquia e permissões:*
+- Use !cargo para ver seu nível
+- Use !ranks para entender o que cada cargo faz
+
+⚙️ *Ajuda completa:* !help
+📞 *Contato com o dono:* !contato
+
+💬 Envie qualquer comando começando com *!* para começar.
+
+Bom uso e boa sorte! 🍀`;
+
+        await reply({ text: texto });
+    } catch (error) {
+        console.error('Erro ao executar !inicio:', error);
+        await reply({ text: '❌ Não foi possível exibir a mensagem de boas-vindas.' });
+    }
+    break;
 
 
 
