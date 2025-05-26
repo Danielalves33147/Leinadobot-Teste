@@ -225,24 +225,33 @@ case '!help':
     try {
         const textoHelp = `🤖 *COMANDOS DISPONÍVEIS* 🤖
 
-*BÁSICOS*
-!ping — Testa se o bot está ativo
-!perdi / !menosuma — Contadores personalizados
-!dado XdY — Rola dados (ex: !3d6)
+🧩 *BÁSICOS* (Todos os usuários)
+
+!inicio — Apresentação do bot
+!ping — Verifica se o bot está ativo
 !s — Gera figurinha de imagem
+!dado XdY — Rola dados (ex: !3d6)
 !sorteio N — Sorteia N pessoas do grupo
 !cargo — Mostra seu cargo atual
-!ranks — Exibe cargos e permissões
+!ranks — Exibe a hierarquia de cargos
+!contato — Fale com o dono
 
-*ADMINISTRATIVOS*
-!addcargo @usuário <cargo>
-!removecargo @usuário
-!ban @usuário
-!bloquear @usuário
-!listarcargos
 
-Ajuda: use !contato
-ℹ️ Veja o que cada cargo pode usar com !ranks`;
+🛡️ *MODERADORES* (Capitão+)
+!all — Menciona todos do grupo
+!listarcargos — Lista quem tem cargo no grupo
+
+⚔️ *ALTOS OFICIAIS* (General+)
+!ban @usuário — Remove alguém do grupo
+!removecargo @usuário — Remove o cargo de alguém
+
+🏛️ *ALTOS COMANDANTES* (Comandante+)
+!addcargo @usuário <cargo> — Atribui um cargo até General
+
+👑 *IMPERADOR*
+!bloquear @usuário — Ativa ou desativa o bloqueio de comandos para o usuário
+
+ℹ️ *Veja mais sobre permissões com !ranks*`;
 
         await reply({ text: textoHelp });
     } catch (error) {
@@ -250,6 +259,7 @@ Ajuda: use !contato
         await reply({ text: '❌ Não foi possível mostrar os comandos no momento.' });
     }
     break;
+
 
 case '!perdi':
     try {
