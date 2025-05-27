@@ -1,7 +1,13 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+require('dotenv').config();
+
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
+
+const axios = require('axios');
 
 const sharp = require('sharp');
 
@@ -178,6 +184,27 @@ async function getUserRoleFromDatabase(userId) {
                 }
             }
 
+
+            async function usarGemini(pergunta) {
+    const apiKey = process.env.GEMINI_API_KEY;
+const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+
+    try {
+        const response = await axios.post(url, {
+            contents: [{ parts: [{ text: pergunta }] }]
+        }, {
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const resposta = response.data.candidates[0]?.content?.parts[0]?.text;
+        return resposta || "🤖 Não consegui entender.";
+    } catch (error) {
+        console.error('Erro na API Gemini:', error.response?.data || error.message);
+        return '❌ Erro ao chamar a IA.';
+    }
+}
+
             const roleHierarchy = ['Recruta', 'Capitão', 'General', 'Comandante', 'Imperador', 'Dono'];
 
             function isRoleAuthorized(userRole, allowedRoles, targetRole = null) {
@@ -221,6 +248,7 @@ async function getUserRoleFromDatabase(userId) {
                             console.error('❌ Erro ao enviar Pong:', err);
                         }
                         break;
+
 case '!help':
     try {
         const textoHelp = `🤖 *COMANDOS DISPONÍVEIS* 🤖
@@ -748,7 +776,27 @@ Bom uso e boa sorte! 🍀`;
         await reply({ text: '❌ Não foi possível exibir a mensagem de boas-vindas.' });
     }
     break;
+    
 
+    case '!ia':
+    try {
+        if (args.length === 0) {
+            await reply({ text: '❓ Use: !ia <sua pergunta>' });
+            break;
+        }
+
+        const pergunta = args.join(' ');
+        await reply({ text: '🤖 Pensando...' });
+
+        const resposta = await usarGemini(pergunta);
+        await reply({ text: resposta });
+        break;
+
+    } catch (err) {
+        console.error('Erro no comando !ia:', err);
+        await reply({ text: '❌ Erro ao obter resposta da IA.' });
+    }
+    break;
 
 
                     default:
