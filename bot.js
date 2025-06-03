@@ -862,16 +862,16 @@ case '!lock':
             return;
         }
 
-        const senderRoleLock = await getUserCargoFromDatabase(senderJid);
+        const senderRole = await getUserCargoFromDatabase(senderJid);
         const cargosAutorizados = ['Comandante', 'Imperador', 'Dono'];
 
-        if (!cargosAutorizados.includes(senderRoleLock.nome)) {
+        if (!senderRole || !cargosAutorizados.includes(senderRole.nome)) {
             await reply({ text: '❌ Você não tem permissão para alterar as permissões do grupo.' });
             return;
         }
 
         const metadata = await sock.groupMetadata(jid);
-        const estadoAtual = metadata.announce; // true = só admins
+        const estadoAtual = metadata.announce; // true = apenas admins
 
         const novoEstado = !estadoAtual;
 
@@ -887,6 +887,7 @@ case '!lock':
         await reply({ text: '❌ Falha ao alterar o estado do grupo.' });
     }
     break;
+
 
 
                     default:
