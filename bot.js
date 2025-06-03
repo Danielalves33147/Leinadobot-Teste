@@ -862,10 +862,16 @@ case '!lock':
             return;
         }
 
-        const senderRole = await getUserCargoFromDatabase(senderJid);
-        const cargosAutorizados = ['Comandante', 'Imperador', 'Dono'];
+        // Consulta direta ao campo 'role' na tabela users
+        const result = await dbClient.query(
+            'SELECT role FROM users WHERE user_id = $1',
+            [senderJid]
+        );
 
-        if (!senderRole || !cargosAutorizados.includes(senderRole.nome)) {
+        const userRole = result.rows[0]?.role || 'Recruta';
+        const autorizados = ['Comandante', 'Imperador', 'Dono'];
+
+        if (!autorizados.includes(userRole)) {
             await reply({ text: '❌ Você não tem permissão para alterar as permissões do grupo.' });
             return;
         }
@@ -874,7 +880,6 @@ case '!lock':
         const estadoAtual = metadata.announce; // true = apenas admins
 
         const novoEstado = !estadoAtual;
-
         await sock.groupSettingUpdate(jid, novoEstado ? 'announcement' : 'not_announcement');
 
         const mensagemStatus = novoEstado
@@ -887,6 +892,7 @@ case '!lock':
         await reply({ text: '❌ Falha ao alterar o estado do grupo.' });
     }
     break;
+
 
 
 
