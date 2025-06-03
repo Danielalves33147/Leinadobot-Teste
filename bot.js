@@ -114,26 +114,26 @@ async function connectToWhatsApp() {
 
             // --- FUNÇÕES AUXILIARES (declaradas dentro do escopo para acesso a sock, dbClient, etc.) ---
 
-async function getUserRoleFromDatabase(userId) {
-    try {
-        const result = await dbClient.query(
-            'SELECT role FROM users WHERE user_id = $1',
-            [userId]
-        );
+async function getUserCargoFromDatabase(userId) {
+  try {
+    const result = await dbClient.query(`
+      SELECT c.nome AS nome, c.nivel AS nivel
+      FROM users u
+      JOIN cargos c ON u.cargo_id = c.id
+      WHERE u.user_id = $1
+    `, [userId]);
 
-        // Se encontrar no banco, retorna o cargo (ou Recruta se vazio)
-        if (result.rows.length > 0) {
-            return result.rows[0].role || 'Recruta';
-        }
-
-        // Se não estiver no banco, apenas considera como Recruta, sem salvar
-        return 'Recruta';
-
-    } catch (error) {
-        console.error('❌ Erro ao buscar cargo do usuário:', error);
-        return 'Recruta';
+    if (result.rows.length > 0) {
+      return result.rows[0]; // { nome: 'Oficial', nivel: 2 }
+    } else {
+      return { nome: 'Recruta', nivel: 4 }; // padrão se não existir
     }
+  } catch (err) {
+    console.error('Erro ao obter cargo do usuário:', err);
+    return { nome: 'Recruta', nivel: 4 };
+  }
 }
+
 
 
             async function logCommand(commandUsed) {
@@ -207,28 +207,25 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-
 
             const roleHierarchy = ['Recruta', 'Capitão', 'General', 'Comandante', 'Imperador', 'Dono'];
 
-            function isRoleAuthorized(userRole, allowedRoles, targetRole = null) {
-                const userRank = roleHierarchy.indexOf(userRole);
-                const targetRank = targetRole ? roleHierarchy.indexOf(targetRole) : -1;
+async function isCargoAuthorized(userId, commandName) {
+  try {
+    const result = await dbClient.query(`
+      SELECT c.nivel AS user_nivel, cmd.nivel_minimo
+      FROM users u
+      JOIN cargos c ON u.cargo_id = c.id
+      JOIN comandos cmd ON cmd.nome = $1
+      WHERE u.user_id = $2
+    `, [commandName, userId]);
 
-                if (userRank === -1) {
-                    console.error(`Cargo não reconhecido: ${userRole}`);
-                    return false;
-                }
+    if (result.rows.length === 0) return false;
 
-                // Dono tem acesso a tudo
-                if (userRole === 'Dono') {
-                    return true;
-                }
-
-                // Verifica se o cargo do usuário está na lista de cargos autorizados
-                const hasBasePermission = allowedRoles.includes(userRole);
-
-                // Se houver um cargo alvo, verifica se o usuário tem nível superior
-                const canActOnTarget = targetRole ? userRank > targetRank : true;
-
-                return hasBasePermission && canActOnTarget;
-            }
+    const { user_nivel, nivel_minimo } = result.rows[0];
+    return user_nivel <= nivel_minimo;
+  } catch (err) {
+    console.error('Erro ao verificar autorização de cargo:', err);
+    return false;
+  }
+}
 
             // --- FIM DAS FUNÇÕES AUXILIARES ---
 
@@ -287,7 +284,6 @@ case '!help':
         await reply({ text: '❌ Não foi possível mostrar os comandos no momento.' });
     }
     break;
-
 
 case '!perdi':
     try {
@@ -373,9 +369,9 @@ case '!ban':
 
         const targetUserId = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
 
-        const senderRole = await getUserRoleFromDatabase(senderJid);
+        const senderRole = await getUserCargoFromDatabase(senderJid);
 
-        const targetUserRole = await getUserRoleFromDatabase(targetUserId);
+        const targetUserRole = await getUserCargoFromDatabase(targetUserId);
 
 
 
@@ -384,7 +380,7 @@ case '!ban':
             return;
         }
 
-        if (!isRoleAuthorized(senderRole, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRole)) {
+        if (!isCargoAuthorized(senderRole, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRole)) {
             await sock.sendMessage(jid, { text: '❌ Você não tem permissão para banir este usuário.' });
             return;
         }
@@ -406,43 +402,48 @@ case '!ban':
     break;
 
 case '!addcargo':
-    try {
-        if (args.length < 2 || !args[0].startsWith('@')) {
-            await sock.sendMessage(jid, { text: 'Uso correto: !addcargo @usuario <cargo>' });
-            break;
-        }
-
-        const targetUserIdAdd = args[0].slice(1) + '@s.whatsapp.net';
-        const newRole = args[1].charAt(0).toUpperCase() + args[1].slice(1).toLowerCase();
-        const senderRoleAdd = await getUserRoleFromDatabase(senderJid);
-        const targetUserRoleAdd = await getUserRoleFromDatabase(targetUserIdAdd);
-
-        if (!Object.values(roles).includes(newRole)) {
-            await sock.sendMessage(jid, { text: `⚠️ Cargo "${newRole}" não existe.` });
-            break;
-        }
-
-        const allowedRolesAdd = ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'];
-        const canGiveRole =
-            roleHierarchy.indexOf(senderRoleAdd) > roleHierarchy.indexOf(newRole) &&
-            (targetUserRoleAdd === undefined || roleHierarchy.indexOf(senderRoleAdd) > roleHierarchy.indexOf(targetUserRoleAdd));
-
-        if (!isRoleAuthorized(senderRoleAdd, allowedRolesAdd, targetUserRoleAdd) || !canGiveRole) {
-            await sock.sendMessage(jid, { text: '❌ Você não tem permissão para atribuir este cargo.' });
-            break;
-        }
-
-        await dbClient.query(
-            'INSERT INTO users (user_id, number, role, last_rank_date, rank_giver_id) VALUES ($1, $2, $3, NOW(), $4) ON CONFLICT (user_id) DO UPDATE SET role = $3, last_rank_date = NOW(), rank_giver_id = $4',
-            [targetUserIdAdd, targetUserIdAdd.split('@')[0], newRole, senderJid]
-        );
-
-        await sock.sendMessage(jid, { text: `✅ Cargo "${newRole}" atribuído a ${args[0]}.` });
-    } catch (error) {
-        console.error('Erro no comando !addcargo:', error);
-        await sock.sendMessage(jid, { text: '❌ Erro ao tentar atribuir o cargo.' });
+  try {
+    if (args.length < 2 || !args[0].startsWith('@')) {
+      await sock.sendMessage(jid, { text: 'Uso correto: !addcargo @usuario <cargo>' });
+      break;
     }
-    break;
+
+    const targetUserIdAdd = args[0].slice(1) + '@s.whatsapp.net';
+    const newRole = args[1].charAt(0).toUpperCase() + args[1].slice(1).toLowerCase();
+    const senderRoleAdd = await getUserCargoFromDatabase(senderJid);
+    const targetUserRoleAdd = await getUserCargoFromDatabase(targetUserIdAdd);
+
+    // Verifica se o cargo é válido buscando o id
+    const cargoResult = await dbClient.query(`SELECT id FROM cargos WHERE nome = $1`, [newRole]);
+    if (cargoResult.rows.length === 0) {
+      await sock.sendMessage(jid, { text: `⚠️ Cargo "${newRole}" não existe.` });
+      break;
+    }
+
+    const cargoId = cargoResult.rows[0].id;
+
+    // Permissões e hierarquia
+    const canGiveRole = senderRoleAdd.nivel < cargoId &&
+                        (targetUserRoleAdd === null || senderRoleAdd.nivel < targetUserRoleAdd.nivel);
+
+    if (!canGiveRole) {
+      await sock.sendMessage(jid, { text: '❌ Você não tem permissão para atribuir este cargo.' });
+      break;
+    }
+
+    await dbClient.query(`
+      INSERT INTO users (user_id, cargo_id, last_rank_date, rank_giver_id)
+      VALUES ($1, $2, NOW(), $3)
+      ON CONFLICT (user_id) DO UPDATE
+      SET cargo_id = $2, last_rank_date = NOW(), rank_giver_id = $3
+    `, [targetUserIdAdd, cargoId, senderJid]);
+
+    await sock.sendMessage(jid, { text: `✅ Cargo "${newRole}" atribuído a ${args[0]}.` });
+  } catch (error) {
+    console.error('Erro no comando !addcargo:', error);
+    await sock.sendMessage(jid, { text: '❌ Erro ao tentar atribuir o cargo.' });
+  }
+  break;
 
 case '!removecargo':
     try {
@@ -452,11 +453,11 @@ case '!removecargo':
         }
 
         const targetUserIdRemove = args[0].slice(1) + '@s.whatsapp.net';
-        const senderRoleRemove = await getUserRoleFromDatabase(senderJid);
-        const targetUserRoleRemove = await getUserRoleFromDatabase(targetUserIdRemove);
+        const senderRoleRemove = await getUserCargoFromDatabase(senderJid);
+        const targetUserRoleRemove = await getUserCargoFromDatabase(targetUserIdRemove);
 
         if (
-            isRoleAuthorized(senderRoleRemove, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRoleRemove) &&
+            isCargoAuthorized(senderRoleRemove, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRoleRemove) &&
             senderRoleRemove !== targetUserRoleRemove
         ) {
             await dbClient.query(
@@ -694,9 +695,9 @@ case '!bloquear':
         }
 
         const targetUserIdBlock = args[0].slice(1) + '@s.whatsapp.net';
-        const senderRoleBlock = await getUserRoleFromDatabase(senderJid);
+        const senderRoleBlock = await getUserCargoFromDatabase(senderJid);
 
-        if (isRoleAuthorized(senderRoleBlock, ['General', 'Comandante', 'Imperador', 'Dono'])) {
+        if (isCargoAuthorized(senderRoleBlock, ['General', 'Comandante', 'Imperador', 'Dono'])) {
             const result = await dbClient.query(
                 'UPDATE users SET is_blocked = NOT COALESCE(is_blocked, FALSE) WHERE user_id = $1 RETURNING is_blocked',
                 [targetUserIdBlock]
@@ -777,8 +778,7 @@ Bom uso e boa sorte! 🍀`;
     }
     break;
     
-
-    case '!ia':
+case '!ia':
     try {
         if (args.length === 0) {
             await reply({ text: '❓ Use: !ia <sua pergunta>' });
@@ -795,6 +795,96 @@ Bom uso e boa sorte! 🍀`;
     } catch (err) {
         console.error('Erro no comando !ia:', err);
         await reply({ text: '❌ Erro ao obter resposta da IA.' });
+    }
+    break;
+
+case '!primeiroacesso':
+    const mensagemPrimeiroAcesso = 
+`👋 *Bem-vindo ao LeinadoBot!*
+
+Se você deseja usar o bot em um grupo, basta *salvar o contato* e *adicionar o bot* ao grupo desejado.
+
+🔹 Você terá acesso aos comandos *básicos* assim que o bot estiver no grupo.
+🔹 Para acessar comandos de moderação ou administração, fale com o responsável pelo bot.
+🔹 Para isso , utilize !contato.
+
+📜 Para ver todos os comandos disponíveis, digite: *!help*
+
+🤖 Divirta-se!`;
+    
+    await sock.sendMessage(jid, { text: mensagemPrimeiroAcesso });
+    break;
+
+case '!att':
+    try {
+        if (senderJid !== DONO) {
+            await reply({ text: '❌ Apenas o Dono pode enviar mensagens globais.' });
+            break;
+        }
+
+        const mensagem = args.join(' ');
+        if (!mensagem) {
+            await reply({ text: '✍️ Escreva a mensagem no formato:\n*!att O comando x mudou para Y*' });
+            break;
+        }
+
+        const texto = `📢 *Aviso da Staff:*\n${mensagem}`;
+        const grupos = await sock.groupFetchAllParticipating();
+
+        let sucesso = 0;
+        let falhas = 0;
+
+        for (const gid in grupos) {
+            try {
+                await sock.sendMessage(gid, { text: texto });
+                sucesso++;
+            } catch (err) {
+                falhas++;
+                console.error(`Erro ao enviar para ${gid}:`, err.message || err);
+            }
+        }
+
+        await reply({
+            text: `✅ Mensagem enviada para ${sucesso} grupo(s).` +
+                  (falhas > 0 ? `\n⚠️ Falhou em ${falhas} grupo(s). Veja o console para detalhes.` : '')
+        });
+
+    } catch (error) {
+        console.error('Erro no comando !att:', error);
+        await reply({ text: '❌ Falha inesperada ao tentar enviar o aviso.' });
+    }
+    break;
+
+case '!lock':
+    try {
+        if (!jid.endsWith('@g.us')) {
+            await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
+            return;
+        }
+
+        const senderRoleLock = await getUserCargoFromDatabase(senderJid);
+        const cargosAutorizados = ['Comandante', 'Imperador', 'Dono'];
+
+        if (!cargosAutorizados.includes(senderRoleLock.nome)) {
+            await reply({ text: '❌ Você não tem permissão para alterar as permissões do grupo.' });
+            return;
+        }
+
+        const metadata = await sock.groupMetadata(jid);
+        const estadoAtual = metadata.announce; // true = só admins
+
+        const novoEstado = !estadoAtual;
+
+        await sock.groupSettingUpdate(jid, novoEstado ? 'announcement' : 'not_announcement');
+
+        const mensagemStatus = novoEstado
+            ? '🔒 *Grupo bloqueado!* Agora apenas administradores podem enviar mensagens.'
+            : '🔓 *Grupo desbloqueado!* Todos os membros podem enviar mensagens.';
+
+        await sock.sendMessage(jid, { text: mensagemStatus });
+    } catch (error) {
+        console.error('Erro no comando !lock:', error);
+        await reply({ text: '❌ Falha ao alterar o estado do grupo.' });
     }
     break;
 
