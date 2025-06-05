@@ -37,12 +37,21 @@ const { Client } = require('pg');
 const dbConfig = {
     user: 'postgres',
     host: 'localhost',
-    database: 'santana',
+    database: 'alves',
     password: '1475',
     port: 5432,
 };
 
 const dbClient = new Client(dbConfig);
+
+
+
+async function isUserBlocked(userId) {
+    const result = await dbClient.query('SELECT is_blocked FROM users WHERE user_id = $1', [userId]);
+    return result.rows.length > 0 && result.rows[0].is_blocked;
+}
+
+
 
 // Função para conectar ao banco de dados e testar a tabela 'users'
 async function connectDB() {
@@ -117,62 +126,23 @@ async function connectToWhatsApp() {
 async function getUserCargoFromDatabase(userId) {
   try {
     const result = await dbClient.query(`
-      SELECT c.nome AS nome, c.nivel AS nivel
+      SELECT c.nome AS nome, c.id AS cargo_id
       FROM users u
       JOIN cargos c ON u.cargo_id = c.id
       WHERE u.user_id = $1
     `, [userId]);
 
     if (result.rows.length > 0) {
-      return result.rows[0]; // { nome: 'Oficial', nivel: 2 }
+      return result.rows[0]; // { nome: 'General', cargo_id: 2 }
     } else {
-      return { nome: 'Recruta', nivel: 4 }; // padrão se não existir
+      return { nome: 'Recruta', cargo_id: 999 }; // 999 para indicar o mais fraco
     }
   } catch (err) {
     console.error('Erro ao obter cargo do usuário:', err);
-    return { nome: 'Recruta', nivel: 4 };
+    return { nome: 'Recruta', cargo_id: 999 };
   }
 }
 
-
-
-            async function logCommand(commandUsed) {
-                try {
-                    await dbClient.query(
-                        'INSERT INTO logs (user_id, user_number, chat_id, command) VALUES ($1, $2, $3, $4)',
-                        [senderJid, senderNumber, jid, commandUsed]
-                    );
-                  //  console.log(`Comando "${commandUsed}" logado no banco de dados.`);
-                } catch (error) {
-                    console.error('Erro ao logar comando:', error);
-                }
-            }
-
-            async function getCounter(counterName) {
-                try {
-                    const result = await dbClient.query(
-                        'SELECT value FROM counters WHERE counter_name = $1',
-                        [counterName]
-                    );
-                    return result.rows[0]?.value || 0;
-                } catch (error) {
-                    console.error(`Erro ao obter contador "${counterName}":`, error);
-                    return 0;
-                }
-            }
-
-            async function incrementCounter(counterName) {
-                try {
-                    const result = await dbClient.query(
-                        'UPDATE counters SET value = value + 1, last_update = NOW() WHERE counter_name = $1 RETURNING value',
-                        [counterName]
-                    );
-                    return result.rows[0]?.value || 0;
-                } catch (error) {
-                    console.error(`Erro ao incrementar contador "${counterName}":`, error);
-                    return 0;
-                }
-            }
 
             async function getAllGroupParticipants(groupId) {
                 try {
@@ -186,8 +156,8 @@ async function getUserCargoFromDatabase(userId) {
 
 
             async function usarGemini(pergunta) {
-    const apiKey = process.env.GEMINI_API_KEY;
-const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            const apiKey = process.env.GEMINI_API_KEY;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
 
     try {
@@ -205,27 +175,7 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-
     }
 }
 
-            const roleHierarchy = ['Recruta', 'Capitão', 'General', 'Comandante', 'Imperador', 'Dono'];
 
-async function isCargoAuthorized(userId, commandName) {
-  try {
-    const result = await dbClient.query(`
-      SELECT c.nivel AS user_nivel, cmd.nivel_minimo
-      FROM users u
-      JOIN cargos c ON u.cargo_id = c.id
-      JOIN comandos cmd ON cmd.nome = $1
-      WHERE u.user_id = $2
-    `, [commandName, userId]);
-
-    if (result.rows.length === 0) return false;
-
-    const { user_nivel, nivel_minimo } = result.rows[0];
-    return user_nivel <= nivel_minimo;
-  } catch (err) {
-    console.error('Erro ao verificar autorização de cargo:', err);
-    return false;
-  }
-}
 
             // --- FIM DAS FUNÇÕES AUXILIARES ---
 
@@ -236,15 +186,39 @@ async function isCargoAuthorized(userId, commandName) {
                 const lowerCommand = command.toLowerCase();
                // await logCommand(lowerCommand); // Logar o comando           
                 const reply = (msg) => sock.sendMessage(jid, msg);
+
+const ignorarBloqueio = ['!contato', '!primeiroacesso'];
+
+if (!ignorarBloqueio.includes(lowerCommand)) {
+    const bloqueado = await isUserBlocked(senderJid);
+    if (bloqueado) {
+        await reply({ text: '🚫 Você está bloqueado e não pode usar comandos.' });
+        return;
+    }
+}
+
+
                 switch (lowerCommand) {
-                    case '!ping':
-                        try {
-                            await sock.sendMessage(jid, { text: '🏓 Pong!' });
-                           // console.log('✅ Pong enviado com sucesso.');
-                        } catch (err) {
-                            console.error('❌ Erro ao enviar Pong:', err);
-                        }
-                        break;
+
+case '!ping':
+    try {
+        // Verifica se o usuário está bloqueado no banco
+        const result = await dbClient.query(
+            'SELECT is_blocked FROM users WHERE user_id = $1',
+            [senderJid]
+        );
+
+        if (result.rows.length > 0 && result.rows[0].is_blocked) {
+            await reply({ text: '🚫 Você está bloqueado e não pode usar comandos.' });
+            return;
+        }
+
+        await sock.sendMessage(jid, { text: '🏓 Pong!' });
+    } catch (err) {
+        console.error('❌ Erro ao executar !ping:', err);
+        await reply({ text: '❌ Ocorreu um erro ao processar o comando.' });
+    }
+    break;
 
 case '!help':
     try {
@@ -285,58 +259,6 @@ case '!help':
     }
     break;
 
-case '!perdi':
-    try {
-        if (!jid.endsWith('@g.us')) {
-            await sock.sendMessage(jid, { text: '⚠️ O comando !perdi só pode ser usado em grupos.' });
-            break;
-        }
-
-        const currentCount = await incrementCounter('perdi');
-        const specificUsers = [
-            '557191165170@s.whatsapp.net', // Daniel
-            '557182903278@s.whatsapp.net', // Melky
-            '557199670849@s.whatsapp.net', // Michael
-            '557181984714@s.whatsapp.net', // Marcos
-            '557181766942@s.whatsapp.net'  // Matheus
-        ];
-
-        const mentions = specificUsers;
-        const mentionText = `Perdemos ${currentCount} vez(es), e subindo! 😔\nMarcando: ${mentions.map(id => `@${id.split('@')[0]}`).join(' ')}`;
-
-        await sock.sendMessage(jid, { text: mentionText, mentions });
-    } catch (error) {
-        console.error('Erro no comando !perdi:', error);
-        await sock.sendMessage(jid, { text: '❌ Erro ao processar o comando !perdi.' });
-    }
-    break;
-
-case '!menosuma':
-    try {
-        if (!jid.endsWith('@g.us')) {
-            await sock.sendMessage(jid, { text: '⚠️ O comando !menosuma só pode ser usado em grupos.' });
-            break;
-        }
-
-        const currentCount = await incrementCounter('menos_uma');
-        const specificUsers = [
-            '557191165170@s.whatsapp.net', // Daniel
-            '557182903278@s.whatsapp.net', // Melky
-            '557199670849@s.whatsapp.net', // Michael
-            '557181984714@s.whatsapp.net', // Marcos
-            '557181766942@s.whatsapp.net'  // Matheus
-        ];
-
-        const mentions = specificUsers;
-        const mentionText = `O devorador ataca novamente!\n - 1 \nVítimas - ${currentCount}\n\n${mentions.map(id => `@${id.split('@')[0]}`).join(' ')}`;
-
-        await sock.sendMessage(jid, { text: mentionText, mentions });
-    } catch (error) {
-        console.error('Erro no comando !menosuma:', error);
-        await sock.sendMessage(jid, { text: '❌ Erro ao processar o comando !menosuma.' });
-    }
-    break;
-
 case '!all':
     try {
         if (!jid.endsWith('@g.us')) {
@@ -352,125 +274,6 @@ case '!all':
     } catch (error) {
         console.error('Erro no comando !all:', error);
         await sock.sendMessage(jid, { text: '❌ Erro ao mencionar todos os participantes.' });
-    }
-    break;
-
-case '!ban':
-    try {
-        if (!jid.endsWith('@g.us')) {
-            await sock.sendMessage(jid, { text: '⚠️ O comando !ban só pode ser usado em grupos.' });
-            return;
-        }
-
-        if (args.length === 0 || !args[0].startsWith('@')) {
-            await sock.sendMessage(jid, { text: '❌ Uso correto: !ban @usuario' });
-            return;
-        }
-
-        const targetUserId = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-
-        const senderRole = await getUserCargoFromDatabase(senderJid);
-
-        const targetUserRole = await getUserCargoFromDatabase(targetUserId);
-
-
-
-        if (!senderRole) {
-            await sock.sendMessage(jid, { text: '❌ Seu cargo não foi encontrado no sistema.' });
-            return;
-        }
-
-        if (!isCargoAuthorized(senderRole, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRole)) {
-            await sock.sendMessage(jid, { text: '❌ Você não tem permissão para banir este usuário.' });
-            return;
-        }
-
-        const groupParticipants = await getAllGroupParticipants(jid);
-        if (!groupParticipants.includes(targetUserId)) {
-            await sock.sendMessage(jid, { text: '❌ Este usuário não está no grupo.' });
-            return;
-        }
-
-
-        await sock.groupParticipantsUpdate(jid, [targetUserId], 'remove');
-        await sock.sendMessage(jid, { text: `✅ Usuário ${args[0]} removido com sucesso.` });
-
-    } catch (err) {
-        console.error('Erro no comando !ban:', err);
-        await sock.sendMessage(jid, { text: '❌ Erro ao tentar banir o usuário.' });
-    }
-    break;
-
-case '!addcargo':
-  try {
-    if (args.length < 2 || !args[0].startsWith('@')) {
-      await sock.sendMessage(jid, { text: 'Uso correto: !addcargo @usuario <cargo>' });
-      break;
-    }
-
-    const targetUserIdAdd = args[0].slice(1) + '@s.whatsapp.net';
-    const newRole = args[1].charAt(0).toUpperCase() + args[1].slice(1).toLowerCase();
-    const senderRoleAdd = await getUserCargoFromDatabase(senderJid);
-    const targetUserRoleAdd = await getUserCargoFromDatabase(targetUserIdAdd);
-
-    // Verifica se o cargo é válido buscando o id
-    const cargoResult = await dbClient.query(`SELECT id FROM cargos WHERE nome = $1`, [newRole]);
-    if (cargoResult.rows.length === 0) {
-      await sock.sendMessage(jid, { text: `⚠️ Cargo "${newRole}" não existe.` });
-      break;
-    }
-
-    const cargoId = cargoResult.rows[0].id;
-
-    // Permissões e hierarquia
-    const canGiveRole = senderRoleAdd.nivel < cargoId &&
-                        (targetUserRoleAdd === null || senderRoleAdd.nivel < targetUserRoleAdd.nivel);
-
-    if (!canGiveRole) {
-      await sock.sendMessage(jid, { text: '❌ Você não tem permissão para atribuir este cargo.' });
-      break;
-    }
-
-    await dbClient.query(`
-      INSERT INTO users (user_id, cargo_id, last_rank_date, rank_giver_id)
-      VALUES ($1, $2, NOW(), $3)
-      ON CONFLICT (user_id) DO UPDATE
-      SET cargo_id = $2, last_rank_date = NOW(), rank_giver_id = $3
-    `, [targetUserIdAdd, cargoId, senderJid]);
-
-    await sock.sendMessage(jid, { text: `✅ Cargo "${newRole}" atribuído a ${args[0]}.` });
-  } catch (error) {
-    console.error('Erro no comando !addcargo:', error);
-    await sock.sendMessage(jid, { text: '❌ Erro ao tentar atribuir o cargo.' });
-  }
-  break;
-
-case '!removecargo':
-    try {
-        if (!args[0]?.startsWith('@')) {
-            await sock.sendMessage(jid, { text: 'Uso correto: !removecargo @usuario' });
-            break;
-        }
-
-        const targetUserIdRemove = args[0].slice(1) + '@s.whatsapp.net';
-        const senderRoleRemove = await getUserCargoFromDatabase(senderJid);
-        const targetUserRoleRemove = await getUserCargoFromDatabase(targetUserIdRemove);
-
-        if (
-            isCargoAuthorized(senderRoleRemove, ['Capitão', 'General', 'Comandante', 'Imperador', 'Dono'], targetUserRoleRemove) &&
-            senderRoleRemove !== targetUserRoleRemove
-        ) {
-            await dbClient.query(
-                'UPDATE users SET role = NULL WHERE user_id = $1',
-                [targetUserIdRemove]
-            );
-            await sock.sendMessage(jid, { text: `✅ Cargo removido de ${args[0]}.` });
-        } else {
-            await sock.sendMessage(jid, { text: '❌ Você não tem permissão para remover o cargo deste usuário.' });
-        }
-    } catch (error) {
-        console.error('Erro no comando !removecargo:', error);
-        await sock.sendMessage(jid, { text: '❌ Falha ao tentar remover o cargo.' });
     }
     break;
 
@@ -621,32 +424,6 @@ case '!contato':
     }
     break;
 
-case '!listarcargos':
-    try {
-        const results = await dbClient.query('SELECT user_id, role FROM users WHERE role IS NOT NULL AND role != $1 ORDER BY role', ['Dono']);
-
-        if (results.rows.length > 0) {
-            let listaCargos = '📜 *Lista de Usuários com Cargos:* 📜\n\n';
-            const mentions = [];
-
-            for (const row of results.rows) {
-                const userId = row.user_id;
-                const role = row.role;
-                const userName = userId.split('@')[0];
-                mentions.push(userId);
-                listaCargos += `- @${userName}: *${role}*\n`;
-            }
-
-            await sock.sendMessage(jid, { text: listaCargos.trim(), mentions });
-        } else {
-            await reply({ text: 'ℹ️ Nenhum usuário possui um cargo definido.' });
-        }
-    } catch (error) {
-        console.error('Erro ao listar cargos:', error);
-        await reply({ text: '❌ Falha ao listar os cargos.' });
-    }
-    break;
-
 case '!ranks':
     try {
         const textoRanks = `📜 *CARGOS & HIERARQUIA* 📜
@@ -682,72 +459,6 @@ Use !cargo para ver seu nível atual`;
     }
     break;
 
-case '!bloquear':
-    try {
-        if (!jid.endsWith('@g.us') && !isPrivate) {
-            await reply({ text: '⚠️ Este comando só pode ser usado em grupos ou no privado.' });
-            return;
-        }
-
-        if (!args[0]?.startsWith('@')) {
-            await reply({ text: '⚠️ Uso correto: !bloquear @usuario' });
-            return;
-        }
-
-        const targetUserIdBlock = args[0].slice(1) + '@s.whatsapp.net';
-        const senderRoleBlock = await getUserCargoFromDatabase(senderJid);
-
-        if (isCargoAuthorized(senderRoleBlock, ['General', 'Comandante', 'Imperador', 'Dono'])) {
-            const result = await dbClient.query(
-                'UPDATE users SET is_blocked = NOT COALESCE(is_blocked, FALSE) WHERE user_id = $1 RETURNING is_blocked',
-                [targetUserIdBlock]
-            );
-
-            const estadoAtual = result.rows[0]?.is_blocked;
-            const statusMsg = estadoAtual ? 'bloqueado' : 'desbloqueado';
-            await reply({ text: `✅ Usuário ${args[0]} ${statusMsg}.` });
-        } else {
-            await reply({ text: '❌ Você não tem permissão para alterar o bloqueio de usuários.' });
-        }
-    } catch (error) {
-        console.error('Erro no comando !bloquear:', error);
-        await reply({ text: '❌ Ocorreu um erro ao tentar atualizar o estado de bloqueio.' });
-    }
-    break;
-
-case '!cargo':
-    try {
-        const result = await dbClient.query(
-            'SELECT role, last_rank_date, rank_giver_id FROM users WHERE user_id = $1',
-            [senderJid]
-        );
-
-        if (result.rows.length === 0 || !result.rows[0].role) {
-            await reply({ text: '🏷️ Você ainda não possui um cargo atribuído.' });
-            return;
-        }
-
-        const { role, last_rank_date, rank_giver_id } = result.rows[0];
-        let mensagem = `🏷️ *Seu Cargo Atual:*\n- Cargo: *${role}*`;
-
-        if (last_rank_date) {
-            const dataFormatada = new Date(last_rank_date).toLocaleDateString('pt-BR');
-            mensagem += `\n- Desde: ${dataFormatada}`;
-        }
-
-        if (rank_giver_id) {
-            const nomeDoador = rank_giver_id.split('@')[0];
-            mensagem += `\n- Atribuído por: @${nomeDoador}`;
-            await reply({ text: mensagem, mentions: [rank_giver_id] });
-        } else {
-            await reply({ text: mensagem });
-        }
-    } catch (error) {
-        console.error('Erro no comando !cargo:', error);
-        await reply({ text: '❌ Não foi possível recuperar seu cargo no momento.' });
-    }
-    break;
-
 case '!inicio':
         try {
         const texto = `👋 *Seja bem-vindo(a)!*
@@ -777,26 +488,6 @@ Bom uso e boa sorte! 🍀`;
         await reply({ text: '❌ Não foi possível exibir a mensagem de boas-vindas.' });
     }
     break;
-    
-case '!ia':
-    try {
-        if (args.length === 0) {
-            await reply({ text: '❓ Use: !ia <sua pergunta>' });
-            break;
-        }
-
-        const pergunta = args.join(' ');
-        await reply({ text: '🤖 Pensando...' });
-
-        const resposta = await usarGemini(pergunta);
-        await reply({ text: resposta });
-        break;
-
-    } catch (err) {
-        console.error('Erro no comando !ia:', err);
-        await reply({ text: '❌ Erro ao obter resposta da IA.' });
-    }
-    break;
 
 case '!primeiroacesso':
     const mensagemPrimeiroAcesso = 
@@ -815,83 +506,578 @@ Se você deseja usar o bot em um grupo, basta *salvar o contato* e *adicionar o 
     await sock.sendMessage(jid, { text: mensagemPrimeiroAcesso });
     break;
 
-case '!att':
-    try {
-        if (senderJid !== DONO) {
-            await reply({ text: '❌ Apenas o Dono pode enviar mensagens globais.' });
-            break;
-        }
-
-        const mensagem = args.join(' ');
-        if (!mensagem) {
-            await reply({ text: '✍️ Escreva a mensagem no formato:\n*!att O comando x mudou para Y*' });
-            break;
-        }
-
-        const texto = `📢 *Aviso da Staff:*\n${mensagem}`;
-        const grupos = await sock.groupFetchAllParticipating();
-
-        let sucesso = 0;
-        let falhas = 0;
-
-        for (const gid in grupos) {
-            try {
-                await sock.sendMessage(gid, { text: texto });
-                sucesso++;
-            } catch (err) {
-                falhas++;
-                console.error(`Erro ao enviar para ${gid}:`, err.message || err);
-            }
-        }
-
-        await reply({
-            text: `✅ Mensagem enviada para ${sucesso} grupo(s).` +
-                  (falhas > 0 ? `\n⚠️ Falhou em ${falhas} grupo(s). Veja o console para detalhes.` : '')
-        });
-
-    } catch (error) {
-        console.error('Erro no comando !att:', error);
-        await reply({ text: '❌ Falha inesperada ao tentar enviar o aviso.' });
-    }
-    break;
-
-case '!lock':
+case '!menosuma':
     try {
         if (!jid.endsWith('@g.us')) {
             await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
-            return;
+            break;
         }
 
-        // Consulta direta ao campo 'role' na tabela users
-        const result = await dbClient.query(
-            'SELECT role FROM users WHERE user_id = $1',
-            [senderJid]
-        );
+        const currentCount = await incrementCounter('menos_uma');
+        const mentions = [
+            '557191165170@s.whatsapp.net', // Daniel
+            '557182903278@s.whatsapp.net', // Melky
+            '557199670849@s.whatsapp.net', // Michael
+            '557181984714@s.whatsapp.net', // Marcos
+            '557181766942@s.whatsapp.net'  // Matheus
+        ];
 
-        const userRole = result.rows[0]?.role || 'Recruta';
-        const autorizados = ['Comandante', 'Imperador', 'Dono'];
+        const texto = `O devorador ataca novamente!\n -1\nVítimas: *${currentCount}*\n\n${mentions.map(id => `@${id.split('@')[0]}`).join(' ')}`;
+        await sock.sendMessage(jid, { text: texto, mentions });
 
-        if (!autorizados.includes(userRole)) {
-            await reply({ text: '❌ Você não tem permissão para alterar as permissões do grupo.' });
-            return;
-        }
-
-        const metadata = await sock.groupMetadata(jid);
-        const estadoAtual = metadata.announce; // true = apenas admins
-
-        const novoEstado = !estadoAtual;
-        await sock.groupSettingUpdate(jid, novoEstado ? 'announcement' : 'not_announcement');
-
-        const mensagemStatus = novoEstado
-            ? '🔒 *Grupo bloqueado!* Agora apenas administradores podem enviar mensagens.'
-            : '🔓 *Grupo desbloqueado!* Todos os membros podem enviar mensagens.';
-
-        await sock.sendMessage(jid, { text: mensagemStatus });
-    } catch (error) {
-        console.error('Erro no comando !lock:', error);
-        await reply({ text: '❌ Falha ao alterar o estado do grupo.' });
+    } catch (err) {
+        console.error('Erro no comando !menosuma:', err);
+        await reply({ text: '❌ Erro ao registrar o ataque do devorador.' });
     }
     break;
+
+case '!perdi':
+    try {
+        if (!jid.endsWith('@g.us')) {
+            await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
+            break;
+        }
+
+        const currentCount = await incrementCounter('perdi');
+        const mentions = [
+            '557191165170@s.whatsapp.net', // Daniel
+            '557182903278@s.whatsapp.net', // Melky
+            '557199670849@s.whatsapp.net', // Michael
+            '557181984714@s.whatsapp.net', // Marcos
+            '557181766942@s.whatsapp.net'  // Matheus
+        ];
+
+        const texto = `Perdemos *${currentCount}* vez(es)... 😔\nMarcando: ${mentions.map(id => `@${id.split('@')[0]}`).join(' ')}`;
+        await sock.sendMessage(jid, { text: texto, mentions });
+
+    } catch (err) {
+        console.error('Erro no comando !perdi:', err);
+        await reply({ text: '❌ Erro ao registrar a derrota.' });
+    }
+    break;
+
+
+// Atualizados para o banco novo
+
+case '!cargo':
+    try {
+        const result = await dbClient.query(`
+            SELECT c.nome AS cargo, u.last_rank_date, u.rank_giver_id
+            FROM users u
+            JOIN cargos c ON u.cargo_id = c.id
+            WHERE u.user_id = $1
+        `, [senderJid]);
+
+        if (result.rows.length === 0) {
+            await reply({ text: '🏷️ Você ainda não possui um cargo atribuído.' });
+            return;
+        }
+
+        const { cargo, last_rank_date, rank_giver_id } = result.rows[0];
+        let mensagem = `🏷️ *Seu Cargo Atual:*\n- Cargo: *${cargo}*`;
+
+        if (last_rank_date) {
+            const dataFormatada = new Date(last_rank_date).toLocaleDateString('pt-BR');
+            mensagem += `\n- Desde: ${dataFormatada}`;
+        }
+
+        if (rank_giver_id) {
+            const nomeDoador = rank_giver_id.split('@')[0];
+            mensagem += `\n- Atribuído por: @${nomeDoador}`;
+            await reply({ text: mensagem, mentions: [rank_giver_id] });
+        } else {
+            await reply({ text: mensagem });
+        }
+
+
+        // Log do comando
+        await dbClient.query(
+          `INSERT INTO logs (user_id, alvo_id, comando)
+           VALUES ($1, $2, $3)`,
+          [senderJid, null, '!cargo']
+        );
+
+    } catch (error) {
+        console.error('Erro no comando !cargo:', error);
+        await reply({ text: '❌ Não foi possível recuperar seu cargo no momento.' });
+    }
+    break;
+
+case '!addcargo':
+  try {
+    if (args.length < 2 || !args[0].startsWith('@')) {
+      await sock.sendMessage(jid, { text: 'Uso correto: !addcargo @usuario <cargo>' });
+      break;
+    }
+
+    const targetUserIdAdd = args[0].slice(1) + '@s.whatsapp.net';
+    const cargoNome = args[1].charAt(0).toUpperCase() + args[1].slice(1).toLowerCase();
+
+    // Cargo do remetente
+    const senderCargoRes = await dbClient.query(`
+      SELECT c.id, c.nome FROM users u JOIN cargos c ON u.cargo_id = c.id WHERE u.user_id = $1
+    `, [senderJid]);
+    if (senderCargoRes.rows.length === 0) throw new Error('Remetente sem cargo definido.');
+    const senderCargoId = senderCargoRes.rows[0].id;
+
+    // Cargo novo (que será atribuído)
+    const cargoResult = await dbClient.query(`SELECT id FROM cargos WHERE nome = $1`, [cargoNome]);
+    if (cargoResult.rows.length === 0) {
+      await sock.sendMessage(jid, { text: `⚠️ Cargo "${cargoNome}" não existe.` });
+      break;
+    }
+    const novoCargoId = cargoResult.rows[0].id;
+
+    // Cargo atual do alvo (se existir)
+    const targetCargoRes = await dbClient.query(`
+      SELECT c.id FROM users u JOIN cargos c ON u.cargo_id = c.id WHERE u.user_id = $1
+    `, [targetUserIdAdd]);
+    const cargoAtualAlvo = targetCargoRes.rows.length > 0 ? targetCargoRes.rows[0].id : null;
+
+    // Verificação de hierarquia
+    if (
+      senderCargoId > novoCargoId || // não pode atribuir um cargo superior
+      (cargoAtualAlvo !== null && senderCargoId > cargoAtualAlvo) // não pode rebaixar cargo igual/superior
+    ) {
+      await sock.sendMessage(jid, { text: '❌ Você não tem permissão para atribuir este cargo.' });
+      break;
+    }
+
+    // Atualiza ou insere usuário
+    await dbClient.query(`
+      INSERT INTO users (user_id, cargo_id, last_rank_date, rank_giver_id)
+      VALUES ($1, $2, NOW(), $3)
+      ON CONFLICT (user_id) DO UPDATE
+      SET cargo_id = $2, last_rank_date = NOW(), rank_giver_id = $3
+    `, [targetUserIdAdd, novoCargoId, senderJid]);
+
+    await sock.sendMessage(jid, { text: `✅ Cargo "${cargoNome}" atribuído a ${args[0]}.` });
+
+
+    await dbClient.query(
+      `INSERT INTO logs (user_id, alvo_id, comando)
+      VALUES ($1, $2, $3)`,
+      [senderJid, targetUserIdAdd, '!addcargo']
+    );
+    
+  } catch (error) {
+    console.error('Erro no comando !addcargo:', error);
+    await sock.sendMessage(jid, { text: '❌ Erro ao tentar atribuir o cargo.' });
+  }
+  break;
+
+case '!removecargo':
+    try {
+        if (!args[0]?.startsWith('@')) {
+            await sock.sendMessage(jid, { text: 'Uso correto: !removecargo @usuario' });
+            break;
+        }
+
+        const targetUserId = args[0].slice(1) + '@s.whatsapp.net';
+
+        // Cargo de quem envia o comando
+        const senderCargoRes = await dbClient.query(`
+            SELECT c.id FROM users u
+            JOIN cargos c ON u.cargo_id = c.id
+            WHERE u.user_id = $1
+        `, [senderJid]);
+
+        if (senderCargoRes.rows.length === 0) {
+            await sock.sendMessage(jid, { text: '❌ Você não possui cargo atribuído.' });
+            break;
+        }
+        const senderCargoId = senderCargoRes.rows[0].id;
+
+        // Cargo do alvo (se existir)
+        const targetCargoRes = await dbClient.query(`
+            SELECT c.id FROM users u
+            JOIN cargos c ON u.cargo_id = c.id
+            WHERE u.user_id = $1
+        `, [targetUserId]);
+
+        if (targetCargoRes.rows.length === 0) {
+            await sock.sendMessage(jid, { text: '⚠️ Esse usuário não possui cargo para ser removido.' });
+            break;
+        }
+        const targetCargoId = targetCargoRes.rows[0].id;
+
+        // Verifica se remetente é superior
+        if (senderCargoId > targetCargoId || senderCargoId === targetCargoId) {
+            await sock.sendMessage(jid, { text: '❌ Você não tem permissão para remover o cargo deste usuário.' });
+            break;
+        }
+
+        await dbClient.query(`
+            UPDATE users
+            SET cargo_id = NULL, last_rank_date = NOW(), rank_giver_id = $1
+            WHERE user_id = $2
+        `, [senderJid, targetUserId]);
+
+        await sock.sendMessage(jid, { text: `✅ Cargo removido de ${args[0]}.` });
+
+
+        await dbClient.query(
+          `INSERT INTO logs (user_id, alvo_id, comando)
+          VALUES ($1, $2, $3)`,
+          [senderJid, targetUserId, `!removecargo`]
+        );
+    } catch (error) {
+        console.error('Erro no comando !removecargo:', error);
+        await sock.sendMessage(jid, { text: '❌ Falha ao tentar remover o cargo.' });
+    }
+    break;
+
+case '!listarcargos':
+    try {
+        const filtros = args.map(arg => arg.toLowerCase());
+        const grupoSomente = filtros.includes('grupo');
+        const nivelFiltro = filtros.find(f => !isNaN(f)) ?? null;
+
+        let query = `
+            SELECT u.user_id, c.nome AS cargo, c.id AS cargo_id
+            FROM users u
+            JOIN cargos c ON u.cargo_id = c.id
+        `;
+        const params = [];
+
+        if (nivelFiltro !== null) {
+            query += ' WHERE c.id <= $1';
+            params.push(Number(nivelFiltro));
+        }
+
+        query += ' ORDER BY c.id';
+
+        const results = await dbClient.query(query, params);
+
+        // Filtra pelos membros do grupo, se solicitado
+        let usuariosFiltrados = results.rows;
+        const mentions = [];
+
+        if (grupoSomente) {
+            const grupoMembros = await sock.groupMetadata(jid);
+            const membrosGrupo = grupoMembros.participants.map(p => p.id);
+            usuariosFiltrados = results.rows.filter(row => membrosGrupo.includes(row.user_id));
+        }
+
+        if (usuariosFiltrados.length === 0) {
+            await reply({ text: 'ℹ️ Nenhum usuário encontrado com os filtros aplicados.' });
+            break;
+        }
+
+        let mensagem = '📜 *Lista de Usuários com Cargos:* 📜\n\n';
+        for (const { user_id, cargo } of usuariosFiltrados) {
+            const nome = user_id.split('@')[0];
+            mensagem += `- @${nome}: *${cargo}*\n`;
+            mentions.push(user_id);
+        }
+
+        await sock.sendMessage(jid, { text: mensagem.trim(), mentions });
+
+        await dbClient.query(
+          `INSERT INTO logs (user_id, alvo_id, comando)
+          VALUES ($1, $2, $3)`,
+          [senderJid, null, `!listarcargos`]
+        );
+
+    } catch (error) {
+        console.error('Erro ao listar cargos:', error);
+        await reply({ text: '❌ Falha ao listar os cargos.' });
+    }
+    break;
+
+case '!bloquear':
+  try {
+    if (!jid.endsWith('@g.us') && !isPrivate) {
+      await reply({ text: '⚠️ Este comando só pode ser usado em grupos ou no privado.' });
+      return;
+    }
+
+    if (!args[0]?.startsWith('@')) {
+      await reply({ text: '⚠️ Uso correto: !bloquear @usuario' });
+      return;
+    }
+
+    const targetUserId = args[0].slice(1) + '@s.whatsapp.net';
+    const comandoAtual = '!bloquear';
+
+    // Recupera o nível do usuário
+    const senderRole = await getUserCargoFromDatabase(senderJid);
+    if (!senderRole || senderRole.cargo_id === undefined) {
+      await reply({ text: '❌ Seu cargo não foi encontrado.' });
+      return;
+    }
+
+    // Recupera o nível mínimo exigido do comando
+    const commandQuery = await dbClient.query(
+      'SELECT nivel_minimo FROM comandos WHERE nome = $1 AND ativo = TRUE',
+      [comandoAtual]
+    );
+
+    if (commandQuery.rows.length === 0) {
+      await reply({ text: `⚠️ O comando "${comandoAtual}" não está ativo ou não foi registrado.` });
+      return;
+    }
+
+    const nivelMinimo = commandQuery.rows[0].nivel_minimo;
+
+    if (senderRole.cargo_id > nivelMinimo) {
+      await reply({ text: '❌ Você não tem permissão para usar este comando.' });
+      return;
+    }
+
+    const result = await dbClient.query(
+      'UPDATE users SET is_blocked = NOT COALESCE(is_blocked, FALSE) WHERE user_id = $1 RETURNING is_blocked',
+      [targetUserId]
+    );
+
+    const estadoAtual = result.rows[0]?.is_blocked;
+    const statusMsg = estadoAtual ? 'bloqueado' : 'desbloqueado';
+    await reply({ text: `✅ Usuário ${args[0]} ${statusMsg}.` });
+
+    await dbClient.query(
+      `INSERT INTO logs (user_id, alvo_id, comando)
+      VALUES ($1, $2, $3)`,
+      [senderJid , targetUserId , `!bloquear`]
+    );
+  } catch (error) {
+    console.error('Erro no comando !bloquear:', error);
+    await reply({ text: '❌ Ocorreu um erro ao tentar atualizar o estado de bloqueio.' });
+  }
+  break;
+
+case '!ban':
+  try {
+    if (!jid.endsWith('@g.us')) {
+      await sock.sendMessage(jid, { text: '⚠️ O comando !ban só pode ser usado em grupos.' });
+      return;
+    }
+
+    if (args.length === 0 || !args[0].startsWith('@')) {
+      await sock.sendMessage(jid, { text: '❌ Uso correto: !ban @usuario' });
+      return;
+    }
+
+    const targetUserId = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+    const comandoAtual = '!ban';
+
+    const senderRole = await getUserCargoFromDatabase(senderJid);
+    const targetRole = await getUserCargoFromDatabase(targetUserId);
+
+    if (!senderRole || senderRole.cargo_id === undefined) {
+      await sock.sendMessage(jid, { text: '❌ Seu cargo não foi encontrado.' });
+      return;
+    }
+
+    const comando = await dbClient.query(
+      'SELECT nivel_minimo FROM comandos WHERE nome = $1 AND ativo = TRUE',
+      [comandoAtual]
+    );
+
+    if (comando.rows.length === 0) {
+      await sock.sendMessage(jid, { text: `⚠️ O comando "${comandoAtual}" não está ativo ou não foi registrado.` });
+      return;
+    }
+
+    const nivelMinimo = comando.rows[0].nivel_minimo;
+
+    if (senderRole.cargo_id > nivelMinimo) {
+      await sock.sendMessage(jid, { text: '❌ Você não tem permissão para usar este comando.' });
+      return;
+    }
+
+    // Não permite banir quem tem mesmo cargo ou superior
+    if (targetRole && senderRole.cargo_id >= targetRole.cargo_id) {
+      await sock.sendMessage(jid, { text: '❌ Você não pode banir alguém do mesmo cargo ou superior.' });
+      return;
+    }
+
+    const groupParticipants = await getAllGroupParticipants(jid);
+    if (!groupParticipants.includes(targetUserId)) {
+      await sock.sendMessage(jid, { text: '❌ Este usuário não está no grupo.' });
+      return;
+    }
+
+    await sock.groupParticipantsUpdate(jid, [targetUserId], 'remove');
+    await sock.sendMessage(jid, { text: `✅ Usuário ${args[0]} removido com sucesso.` });
+
+    await dbClient.query(
+        `INSERT INTO logs (user_id, alvo_id, comando)
+        VALUES ($1, $2, $3)`,
+        [senderJid , targetUserId , `!ban`]
+    );
+  } catch (err) {
+    console.error('Erro no comando !ban:', err);
+    await sock.sendMessage(jid, { text: '❌ Erro ao tentar banir o usuário.' });
+  }
+  break;
+
+case '!ia':
+  try {
+    const comandoAtual = '!ia';
+
+    const senderRole = await getUserCargoFromDatabase(senderJid);
+    if (!senderRole || senderRole.cargo_id === undefined) {
+      await reply({ text: '❌ Seu cargo não foi encontrado.' });
+      break;
+    }
+
+    const comando = await dbClient.query(
+      'SELECT nivel_minimo FROM comandos WHERE nome = $1 AND ativo = TRUE',
+      [comandoAtual]
+    );
+
+    if (comando.rows.length === 0) {
+      await reply({ text: `⚠️ O comando "${comandoAtual}" não está registrado ou está desativado.` });
+      break;
+    }
+
+    const nivelMinimo = comando.rows[0].nivel_minimo;
+    if (senderRole.cargo_id > nivelMinimo) {
+      await reply({ text: '❌ Você não tem permissão para usar este comando.' });
+      break;
+    }
+
+    if (args.length === 0) {
+      await reply({ text: '❓ Use: !ia <sua pergunta>' });
+      break;
+    }
+
+    const pergunta = args.join(' ');
+    await reply({ text: '🤖 Pensando...' });
+
+    const resposta = await usarGemini(pergunta);
+    await reply({ text: resposta });
+
+    await dbClient.query(
+        `INSERT INTO logs (user_id, alvo_id, comando)
+        VALUES ($1, $2, $3)`,
+        [senderJid, null, `!ia`]
+    );
+
+  } catch (err) {
+    console.error('Erro no comando !ia:', err);
+    await reply({ text: '❌ Erro ao obter resposta da IA.' });
+  }
+  break;
+
+case '!att':
+  try {
+    const comandoAtual = '!att';
+
+    const senderRole = await getUserCargoFromDatabase(senderJid);
+    if (!senderRole || senderRole.cargo_id === undefined) {
+      await reply({ text: '❌ Seu cargo não foi encontrado.' });
+      break;
+    }
+
+    const comando = await dbClient.query(
+      'SELECT nivel_minimo FROM comandos WHERE nome = $1 AND ativo = TRUE',
+      [comandoAtual]
+    );
+
+    if (comando.rows.length === 0) {
+      await reply({ text: `⚠️ O comando "${comandoAtual}" não está registrado ou está desativado.` });
+      break;
+    }
+
+    const nivelMinimo = comando.rows[0].nivel_minimo;
+    if (senderRole.cargo_id > nivelMinimo) {
+      await reply({ text: '❌ Você não tem permissão para usar este comando.' });
+      break;
+    }
+
+    const mensagem = args.join(' ');
+    if (!mensagem) {
+      await reply({ text: '✍️ Escreva a mensagem no formato:\n*!att O comando x mudou para Y*' });
+      break;
+    }
+
+    const texto = `📢 *Aviso da Staff:*\n${mensagem}`;
+    const grupos = await sock.groupFetchAllParticipating();
+
+    let sucesso = 0;
+    let falhas = 0;
+
+    for (const gid in grupos) {
+      try {
+        await sock.sendMessage(gid, { text: texto });
+        sucesso++;
+      } catch (err) {
+        falhas++;
+        console.error(`Erro ao enviar para ${gid}:`, err.message || err);
+      }
+    }
+
+    await reply({
+      text: `✅ Mensagem enviada para ${sucesso} grupo(s).` +
+            (falhas > 0 ? `\n⚠️ Falhou em ${falhas} grupo(s). Veja o console para detalhes.` : '')
+    });
+
+    await dbClient.query(
+        `INSERT INTO logs (user_id, alvo_id, comando)
+        VALUES ($1, $2, $3)`,
+        [senderJid, null, `!att`]
+    );
+
+  } catch (error) {
+    console.error('Erro no comando !att:', error);
+    await reply({ text: '❌ Falha inesperada ao tentar enviar o aviso.' });
+  }
+  break;
+
+case '!lock':
+  try {
+    if (!jid.endsWith('@g.us')) {
+      await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
+      return;
+    }
+
+    const comandoAtual = '!lock';
+    const senderRole = await getUserCargoFromDatabase(senderJid);
+
+    if (!senderRole || senderRole.cargo_id === undefined) {
+      await reply({ text: '❌ Seu cargo não foi encontrado.' });
+      return;
+    }
+
+    const comando = await dbClient.query(
+      'SELECT nivel_minimo FROM comandos WHERE nome = $1 AND ativo = TRUE',
+      [comandoAtual]
+    );
+
+    if (comando.rows.length === 0) {
+      await reply({ text: `⚠️ O comando "${comandoAtual}" não está registrado ou está desativado.` });
+      return;
+    }
+
+    const nivelMinimo = comando.rows[0].nivel_minimo;
+    if (senderRole.cargo_id > nivelMinimo) {
+      await reply({ text: '❌ Você não tem permissão para alterar as permissões do grupo.' });
+      return;
+    }
+
+    const metadata = await sock.groupMetadata(jid);
+    const estadoAtual = metadata.announce; // true = só admins
+    const novoEstado = !estadoAtual;
+
+    await sock.groupSettingUpdate(jid, novoEstado ? 'announcement' : 'not_announcement');
+
+    const mensagemStatus = novoEstado
+      ? '🔒 *Grupo bloqueado!* Agora apenas administradores podem enviar mensagens.'
+      : '🔓 *Grupo desbloqueado!* Todos os membros podem enviar mensagens.';
+
+    await sock.sendMessage(jid, { text: mensagemStatus });
+
+        await dbClient.query(
+        `INSERT INTO logs (user_id, alvo_id, comando)
+        VALUES ($1, $2, $3)`,
+        [senderJid, null, `!lock`]
+    );
+  } catch (error) {
+    console.error('Erro no comando !lock:', error);
+    await reply({ text: '❌ Falha ao alterar o estado do grupo.' });
+  }
+  break;
 
 
 
@@ -904,7 +1090,7 @@ case '!lock':
             } else if (isPrivate && text) {
                 const now = Date.now();
                 if (!privateFloodCooldown[jid] || now - privateFloodCooldown[jid] > FLOOD_COOLDOWN_TIME_MS) {
-                    await sock.sendMessage(jid, { text: '🤖 Este é um robô. Use comandos iniciados com "!" (ex: !help).' });
+                    await sock.sendMessage(jid, { text: '🤖 Este é um robô. Use comandos iniciados com "!" (ex: !primeiroacesso ou !inicio).' });
                     privateFloodCooldown[jid] = now;
                 }
            } /* else {
