@@ -17,12 +17,6 @@ const DONO = '557191165170@s.whatsapp.net'; // Altere para o número real do don
 const privateFloodCooldown = {}; // Objeto para armazenar o último tempo de resposta para cada chat privado
 const FLOOD_COOLDOWN_TIME_MS = 5000; // 5 segundos de cooldown
 
-const { Pool } = require('pg');
-require('dotenv').config();
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 // CONFIGURANDO BANCO DE DADOS POSTGRESQL
 
@@ -1034,13 +1028,13 @@ case '!force':
             break;
         }
 
-        const existe = await pool.query('SELECT 1 FROM counters WHERE counter_name = $1', [nome]);
+        const existe = await dbClient.query('SELECT 1 FROM counters WHERE counter_name = $1', [nome]);
         if (existe.rowCount === 0) {
             await reply({ text: `⚠️ Contador *${nome}* não existe.` });
             break;
         }
 
-        await pool.query(
+        await dbClient.query(
             'UPDATE counters SET value = $1, last_update = CURRENT_TIMESTAMP WHERE counter_name = $2',
             [valor, nome]
         );
