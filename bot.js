@@ -29,11 +29,12 @@ const pool = new Pool({
 const { Client } = require('pg');
 
 const dbConfig = {
-    user: 'postgres',
-    host: 'localhost',
-    database: 'alves',
-    password: '1475',
-    port: 5432,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
+
 };
 
 const dbClient = new Client(dbConfig);
@@ -206,25 +207,6 @@ if (!ignorarBloqueio.includes(lowerCommand)) {
         return;
     }
 }
-
-/*const nomeContador = command.slice(1).toLowerCase();
-
-try {
-    // Verifica se é um contador existente
-    const { rows } = await pool.query('SELECT * FROM counters WHERE counter_name = $1', [nomeContador]);
-
-    if (rows.length > 0) {
-        const current = await incrementCounter(nomeContador);
-        const texto = `📊 Contador *${nomeContador}*: ${current}`;
-        await reply({ text: texto });
-        return;
-    }
-} catch (err) {
-    console.error(`Erro ao lidar com contador ${nomeContador}:`, err);
-    await reply({ text: `❌ Erro ao lidar com contador '${nomeContador}'.` });
-    return;
-}
-*/
 
                 switch (lowerCommand) {
 case '!help':
@@ -1135,35 +1117,6 @@ case '!att':
   }
   break;
 
-/*
-case '!addcounter':
-    try {
-        if (args.length < 1) {
-            await reply({ text: '⚠️ Use: !addcounter <nome>' });
-            break;
-        }
-
-        const nome = args[0].toLowerCase();
-        const existe = await pool.query('SELECT 1 FROM counters WHERE counter_name = $1', [nome]);
-
-        if (existe.rowCount > 0) {
-            await reply({ text: `⚠️ O contador *${nome}* já existe.` });
-            break;
-        }
-
-        await pool.query(
-            'INSERT INTO counters (counter_name, value) VALUES ($1, 0)',
-            [nome]
-        );
-
-        await reply({ text: `✅ Contador *${nome}* criado com sucesso.` });
-    } catch (err) {
-        console.error('Erro em !addcounter:', err);
-        await reply({ text: '❌ Erro ao criar contador.' });
-    }
-    break;
-    
-    */
                     default:
                         console.log(`Comando desconhecido: ${command}`);
                         await sock.sendMessage(jid, { text: 'Comando desconhecido. Use !help para ver os comandos disponíveis.' });
