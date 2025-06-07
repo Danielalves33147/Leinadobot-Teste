@@ -17,6 +17,12 @@ const DONO = '557191165170@s.whatsapp.net'; // Altere para o número real do don
 const privateFloodCooldown = {}; // Objeto para armazenar o último tempo de resposta para cada chat privado
 const FLOOD_COOLDOWN_TIME_MS = 5000; // 5 segundos de cooldown
 
+const { Pool } = require('pg');
+require('dotenv').config();
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
 // CONFIGURANDO BANCO DE DADOS POSTGRESQL
 
