@@ -53,6 +53,7 @@ async function isUserBlocked(userId) {
 
 
 
+
 // Função para conectar ao banco de dados e testar a tabela 'users'
 async function connectDB() {
     try {
@@ -142,6 +143,25 @@ async function getUserCargoFromDatabase(userId) {
     return { nome: 'Recruta', cargo_id: 999 };
   }
 }
+
+            // Função auxiliar para incrementar contadores
+async function incrementCounter(tipo) {
+    try {
+        await dbClient.query(`
+            INSERT INTO counters (tipo, valor)
+            VALUES ($1, 1)
+            ON CONFLICT (tipo) DO UPDATE
+            SET valor = counters.valor + 1
+        `, [tipo]);
+
+        const res = await dbClient.query(`SELECT valor FROM counters WHERE tipo = $1`, [tipo]);
+        return res.rows[0].valor;
+    } catch (error) {
+        console.error('Erro ao incrementar contador:', error);
+        return 0;
+    }
+}
+
 
 
             async function getAllGroupParticipants(groupId) {
