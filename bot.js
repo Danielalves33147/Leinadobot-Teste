@@ -14,20 +14,8 @@ const sharp = require('sharp');
 // DONO DO BOT
 const DONO = '557191165170@s.whatsapp.net'; // Altere para o número real do dono
 
-
 const privateFloodCooldown = {}; // Objeto para armazenar o último tempo de resposta para cada chat privado
 const FLOOD_COOLDOWN_TIME_MS = 5000; // 5 segundos de cooldown
-
-//PATENTES
-
-const roles = {
-    recruta: 'Recruta',
-    capitao: 'Capitão',
-    general: 'General',
-    comandante: 'Comandante',
-    imperador: 'Imperador',
-    dono: 'Dono',
-};
 
 
 // CONFIGURANDO BANCO DE DADOS POSTGRESQL
@@ -44,15 +32,10 @@ const dbConfig = {
 
 const dbClient = new Client(dbConfig);
 
-
-
 async function isUserBlocked(userId) {
     const result = await dbClient.query('SELECT is_blocked FROM users WHERE user_id = $1', [userId]);
     return result.rows.length > 0 && result.rows[0].is_blocked;
 }
-
-
-
 
 // Função para conectar ao banco de dados e testar a tabela 'users'
 async function connectDB() {
@@ -72,7 +55,6 @@ async function connectDB() {
         console.error('❌ Erro ao conectar ou ler a tabela users:', err.message || err);
     }
 }
-
 
 connectDB();
 
@@ -145,22 +127,24 @@ async function getUserCargoFromDatabase(userId) {
 }
 
             // Função auxiliar para incrementar contadores
-async function incrementCounter(tipo) {
-    try {
-        await dbClient.query(`
-            INSERT INTO counters (tipo, valor)
-            VALUES ($1, 1)
-            ON CONFLICT (tipo) DO UPDATE
-            SET valor = counters.valor + 1
-        `, [tipo]);
+async function incrementCounter(counterName) {
+  try {
+    const result = await dbClient.query(`
+      INSERT INTO counters (counter_name, value)
+      VALUES ($1, 1)
+      ON CONFLICT (counter_name)
+      DO UPDATE SET value = counters.value + 1, last_update = NOW()
+      RETURNING value
+    `, [counterName]);
 
-        const res = await dbClient.query(`SELECT valor FROM counters WHERE tipo = $1`, [tipo]);
-        return res.rows[0].valor;
-    } catch (error) {
-        console.error('Erro ao incrementar contador:', error);
-        return 0;
-    }
+    return result.rows[0].value;
+
+  } catch (error) {
+    console.error('Erro ao incrementar contador:', error);
+    throw error;
+  }
 }
+
 
 
 
@@ -217,8 +201,62 @@ if (!ignorarBloqueio.includes(lowerCommand)) {
     }
 }
 
+const nomeContador = command.slice(1).toLowerCase();
+
+try {
+    // Verifica se é um contador existente
+    const { rows } = await pool.query('SELECT * FROM counters WHERE counter_name = $1', [nomeContador]);
+
+    if (rows.length > 0) {
+        const current = await incrementCounter(nomeContador);
+        const texto = `📊 Contador *${nomeContador}*: ${current}`;
+        await reply({ text: texto });
+        return;
+    }
+} catch (err) {
+    console.error(`Erro ao lidar com contador ${nomeContador}:`, err);
+    await reply({ text: `❌ Erro ao lidar com contador '${nomeContador}'.` });
+    return;
+}
+
 
                 switch (lowerCommand) {
+case '!help':
+    try {
+        const textoHelp = `🤖 *COMANDOS DISPONÍVEIS* 🤖
+
+🔰 *GERAIS (Todos os usuários)*
+!ping — Verifica se o bot está online
+!s — Cria figurinha a partir de imagem
+!dado XdY — Rola dados no estilo (ex: !3d6)
+!perdi — Adiciona 1 ao contador de derrotas
+!menosuma — Registra um ataque do devorador
+!sorteio N — Sorteia N pessoas do grupo
+!cargo — Mostra seu cargo atual
+!ranks — Exibe a hierarquia dos cargos
+!inicio — Mensagem inicial e orientações
+!contato — Fale com o dono do bot
+
+👥 *MODERAÇÃO (Capitão+)*
+!all — Menciona todos os membros do grupo
+!listarcargos — Lista usuários com cargos
+!lock — Bloqueia ou desbloqueia o grupo
+
+🛡️ *ADMINISTRAÇÃO (Oficial+)*
+!ban @usuário — Remove alguém do grupo
+!addcargo @usuário <cargo> — Atribui um cargo
+!removecargo @usuário — Remove o cargo de alguém
+
+👑 *ALTA AUTORIDADE (Imperador+)*
+!bloquear @usuário — Ativa ou desativa comandos de um usuário
+!ia <pergunta> — Consulta a IA para respostas`;
+
+        await reply({ text: textoHelp });
+    } catch (error) {
+        console.error('Erro ao exibir !help:', error);
+        await reply({ text: '❌ Não foi possível mostrar os comandos no momento.' });
+    }
+    break;
 
 case '!ping':
     try {
@@ -237,45 +275,6 @@ case '!ping':
     } catch (err) {
         console.error('❌ Erro ao executar !ping:', err);
         await reply({ text: '❌ Ocorreu um erro ao processar o comando.' });
-    }
-    break;
-
-case '!help':
-    try {
-        const textoHelp = `🤖 *COMANDOS DISPONÍVEIS* 🤖
-
-🧩 *BÁSICOS* (Todos os usuários)
-
-!inicio — Apresentação do bot
-!ping — Verifica se o bot está ativo
-!s — Gera figurinha de imagem
-!dado XdY — Rola dados (ex: !3d6)
-!sorteio N — Sorteia N pessoas do grupo
-!cargo — Mostra seu cargo atual
-!ranks — Exibe a hierarquia de cargos
-!contato — Fale com o dono
-
-
-🛡️ *MODERADORES* (Capitão+)
-!all — Menciona todos do grupo
-!listarcargos — Lista quem tem cargo no grupo
-
-⚔️ *ALTOS OFICIAIS* (General+)
-!ban @usuário — Remove alguém do grupo
-!removecargo @usuário — Remove o cargo de alguém
-
-🏛️ *ALTOS COMANDANTES* (Comandante+)
-!addcargo @usuário <cargo> — Atribui um cargo até General
-
-👑 *IMPERADOR*
-!bloquear @usuário — Ativa ou desativa o bloqueio de comandos para o usuário
-
-ℹ️ *Veja mais sobre permissões com !ranks*`;
-
-        await reply({ text: textoHelp });
-    } catch (error) {
-        console.error('Erro ao exibir !help:', error);
-        await reply({ text: '❌ Não foi possível mostrar os comandos no momento.' });
     }
     break;
 
@@ -446,31 +445,25 @@ case '!contato':
 
 case '!ranks':
     try {
-        const textoRanks = `📜 *CARGOS & HIERARQUIA* 📜
+        const textoRanks = `📜 *CARGOS E FUNÇÕES* 📜
 
-🔹 *Recruta*
-Comandos: !ping, !perdi, !menosuma, !dado, !s
-Sem permissões administrativas
+🔹 *Recruta*  
+Acesso básico. Pode usar comandos simples.
 
-🔸 *Capitão*
-Comandos: !all, !sorteio
-Pode usar !listarcargos
+🔸 *Capitão*  
+Pode sortear membros, ver cargos e mencionar todos.
 
-🔸 *General*
-Pode usar !ban
-Pode promover até Capitão
-Pode usar !removecargo
+🔸 *Oficial*  
+Administra usuários com banimentos e promoções.
 
-🔸 *Comandante*
-Pode promover até General
-Acesso total aos comandos administrativos
+🔸 *Comandante*  
+Comando quase total do sistema, incluindo cargos.
 
-🔸 *Imperador*
-Pode promover até Comandante
-Controle total sobre o sistema de patentes
-Pode usar !bloquear
+👑 *Imperador*  
+Controle absoluto. Pode até bloquear comandos de outros.
 
-Use !cargo para ver seu nível atual`;
+Use *!cargo* para ver seu cargo atual.
+`;
 
         await reply({ text: textoRanks });
     } catch (error) {
@@ -481,26 +474,21 @@ Use !cargo para ver seu nível atual`;
 
 case '!inicio':
         try {
-        const texto = `👋 *Seja bem-vindo(a)!*
+        const texto = `👋 *Bem-vindo ao LeinadoBot!*
 
-📌 Este bot ajuda na organização do grupo e oferece comandos úteis.
+Este bot funciona tanto em *grupos* quanto no *privado*.
 
-🧩 *Comandos básicos:*
-- !ping — Verifica se estou online
-- !perdi / !menosuma — Contadores divertidos
-- !dado XdY — Role dados (ex: !3d6)
-- !s — Transforme imagens em figurinhas
+🔹 *No privado*:  
+Use comandos como !ping, !dado, !perdi, !s e outros para se divertir ou testar.
 
-🔐 *Hierarquia e permissões:*
-- Use !cargo para ver seu nível
-- Use !ranks para entender o que cada cargo faz
+🔹 *Em grupos*:  
+O bot ajuda na *organização*, *moderação* e *interação* com os membros.
 
-⚙️ *Ajuda completa:* !help
-📞 *Contato com o dono:* !contato
+🛡️ Cargos definem o que cada um pode fazer. Veja com *!ranks*.  
+📞 Para suporte, use *!contato*.  
+📜 Use *!help* para ver tudo que pode fazer aqui.
 
-💬 Envie qualquer comando começando com *!* para começar.
-
-Bom uso e boa sorte! 🍀`;
+Aproveite o poder do LeinadoBot!`;
 
         await reply({ text: texto });
     } catch (error) {
@@ -508,74 +496,6 @@ Bom uso e boa sorte! 🍀`;
         await reply({ text: '❌ Não foi possível exibir a mensagem de boas-vindas.' });
     }
     break;
-
-case '!primeiroacesso':
-    const mensagemPrimeiroAcesso = 
-`👋 *Bem-vindo ao LeinadoBot!*
-
-Se você deseja usar o bot em um grupo, basta *salvar o contato* e *adicionar o bot* ao grupo desejado.
-
-🔹 Você terá acesso aos comandos *básicos* assim que o bot estiver no grupo.
-🔹 Para acessar comandos de moderação ou administração, fale com o responsável pelo bot.
-🔹 Para isso , utilize !contato.
-
-📜 Para ver todos os comandos disponíveis, digite: *!help*
-
-🤖 Divirta-se!`;
-    
-    await sock.sendMessage(jid, { text: mensagemPrimeiroAcesso });
-    break;
-
-case '!menosuma':
-    try {
-        if (!jid.endsWith('@g.us')) {
-            await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
-            break;
-        }
-
-        const currentCount = await incrementCounter('menos_uma');
-        const mentions = [
-            '557191165170@s.whatsapp.net', // Daniel
-            '557182903278@s.whatsapp.net', // Melky
-            '557199670849@s.whatsapp.net', // Michael
-            '557181984714@s.whatsapp.net', // Marcos
-            '557181766942@s.whatsapp.net'  // Matheus
-        ];
-
-        const texto = `O devorador ataca novamente!\n -1\nVítimas: *${currentCount}*\n\n${mentions.map(id => `@${id.split('@')[0]}`).join(' ')}`;
-        await sock.sendMessage(jid, { text: texto, mentions });
-
-    } catch (err) {
-        console.error('Erro no comando !menosuma:', err);
-        await reply({ text: '❌ Erro ao registrar o ataque do devorador.' });
-    }
-    break;
-
-case '!perdi':
-    try {
-        if (!jid.endsWith('@g.us')) {
-            await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
-            break;
-        }
-
-        const currentCount = await incrementCounter('perdi');
-        const mentions = [
-            '557191165170@s.whatsapp.net', // Daniel
-            '557182903278@s.whatsapp.net', // Melky
-            '557199670849@s.whatsapp.net', // Michael
-            '557181984714@s.whatsapp.net', // Marcos
-            '557181766942@s.whatsapp.net'  // Matheus
-        ];
-
-        const texto = `Perdemos *${currentCount}* vez(es)... 😔\nMarcando: ${mentions.map(id => `@${id.split('@')[0]}`).join(' ')}`;
-        await sock.sendMessage(jid, { text: texto, mentions });
-
-    } catch (err) {
-        console.error('Erro no comando !perdi:', err);
-        await reply({ text: '❌ Erro ao registrar a derrota.' });
-    }
-    break;
-
 
 // Atualizados para o banco novo
 
@@ -980,6 +900,119 @@ case '!ia':
   }
   break;
 
+case '!lock':
+  try {
+    if (!jid.endsWith('@g.us')) {
+      await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
+      return;
+    }
+
+    const comandoAtual = '!lock';
+    const senderRole = await getUserCargoFromDatabase(senderJid);
+
+    if (!senderRole || senderRole.cargo_id === undefined) {
+      await reply({ text: '❌ Seu cargo não foi encontrado.' });
+      return;
+    }
+
+    const comando = await dbClient.query(
+      'SELECT nivel_minimo FROM comandos WHERE nome = $1 AND ativo = TRUE',
+      [comandoAtual]
+    );
+
+    if (comando.rows.length === 0) {
+      await reply({ text: `⚠️ O comando "${comandoAtual}" não está registrado ou está desativado.` });
+      return;
+    }
+
+    const nivelMinimo = comando.rows[0].nivel_minimo;
+    if (senderRole.cargo_id > nivelMinimo) {
+      await reply({ text: '❌ Você não tem permissão para alterar as permissões do grupo.' });
+      return;
+    }
+
+    const metadata = await sock.groupMetadata(jid);
+    const estadoAtual = metadata.announce; // true = só admins
+    const novoEstado = !estadoAtual;
+
+    await sock.groupSettingUpdate(jid, novoEstado ? 'announcement' : 'not_announcement');
+
+    const mensagemStatus = novoEstado
+      ? '🔒 *Grupo bloqueado!* Agora apenas administradores podem enviar mensagens.'
+      : '🔓 *Grupo desbloqueado!* Todos os membros podem enviar mensagens.';
+
+    await sock.sendMessage(jid, { text: mensagemStatus });
+
+        await dbClient.query(
+        `INSERT INTO logs (user_id, alvo_id, comando)
+        VALUES ($1, $2, $3)`,
+        [senderJid, null, `!lock`]
+    );
+  } catch (error) {
+    console.error('Erro no comando !lock:', error);
+    await reply({ text: '❌ Falha ao alterar o estado do grupo.' });
+  }
+  break;
+
+// Comandos Secretos
+
+case '!comandossecretos':
+    try {
+        if (nivel !== 0) {
+            await reply({ text: 'Comando não reconhecido.' });
+            break;
+        }
+
+        const textoSecreto = `🕵️‍♂️ *COMANDOS SECRETOS* 🕵️‍♂️
+
+🔧 *Ajustes de Contadores*
+!force <contador> <valor> — Define o valor exato de um contador (ex: !force perdi 42)
+
+📢 *Mensagens Globais*
+!att — Envia uma mensagem para todos os grupos registrados
+
+🛠️ *Manutenção e Testes*
+(Outros comandos ocultos ainda em fase de elaboração...)`;
+
+        await reply({ text: textoSecreto });
+    } catch (err) {
+        console.error('Erro ao exibir comandos secretos:', err);
+        await reply({ text: '❌ Falha ao exibir comandos secretos.' });
+    }
+    break;
+
+case '!force':
+    try {
+        if (nivel !== 0) {
+            await reply({ text: 'Comando não reconhecido.' });
+            break;
+        }
+
+        const [nome, valorStr] = args;
+        const valor = parseInt(valorStr);
+
+        if (!nome || isNaN(valor)) {
+            await reply({ text: '❌ Uso correto: !setcounter <contador> <valor>' });
+            break;
+        }
+
+        const result = await pool.query(
+            'UPDATE counters SET value = $1, last_update = CURRENT_TIMESTAMP WHERE counter_name = $2 RETURNING value',
+            [valor, nome]
+        );
+
+        if (result.rowCount === 0) {
+            await reply({ text: `❌ Contador '${nome}' não encontrado.` });
+        } else {
+            await reply({ text: `✅ Contador *${nome}* ajustado para ${valor}.` });
+        }
+
+    } catch (err) {
+        console.error('Erro no comando !setcounter:', err);
+        await reply({ text: '❌ Erro ao ajustar o contador.' });
+    }
+    break;
+
 case '!att':
   try {
     const comandoAtual = '!att';
@@ -1045,61 +1078,32 @@ case '!att':
   }
   break;
 
-case '!lock':
-  try {
-    if (!jid.endsWith('@g.us')) {
-      await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
-      return;
+case '!addcounter':
+    try {
+        if (args.length < 1) {
+            await reply({ text: '⚠️ Use: !addcounter <nome>' });
+            break;
+        }
+
+        const nome = args[0].toLowerCase();
+        const existe = await pool.query('SELECT 1 FROM counters WHERE counter_name = $1', [nome]);
+
+        if (existe.rowCount > 0) {
+            await reply({ text: `⚠️ O contador *${nome}* já existe.` });
+            break;
+        }
+
+        await pool.query(
+            'INSERT INTO counters (counter_name, value) VALUES ($1, 0)',
+            [nome]
+        );
+
+        await reply({ text: `✅ Contador *${nome}* criado com sucesso.` });
+    } catch (err) {
+        console.error('Erro em !addcounter:', err);
+        await reply({ text: '❌ Erro ao criar contador.' });
     }
-
-    const comandoAtual = '!lock';
-    const senderRole = await getUserCargoFromDatabase(senderJid);
-
-    if (!senderRole || senderRole.cargo_id === undefined) {
-      await reply({ text: '❌ Seu cargo não foi encontrado.' });
-      return;
-    }
-
-    const comando = await dbClient.query(
-      'SELECT nivel_minimo FROM comandos WHERE nome = $1 AND ativo = TRUE',
-      [comandoAtual]
-    );
-
-    if (comando.rows.length === 0) {
-      await reply({ text: `⚠️ O comando "${comandoAtual}" não está registrado ou está desativado.` });
-      return;
-    }
-
-    const nivelMinimo = comando.rows[0].nivel_minimo;
-    if (senderRole.cargo_id > nivelMinimo) {
-      await reply({ text: '❌ Você não tem permissão para alterar as permissões do grupo.' });
-      return;
-    }
-
-    const metadata = await sock.groupMetadata(jid);
-    const estadoAtual = metadata.announce; // true = só admins
-    const novoEstado = !estadoAtual;
-
-    await sock.groupSettingUpdate(jid, novoEstado ? 'announcement' : 'not_announcement');
-
-    const mensagemStatus = novoEstado
-      ? '🔒 *Grupo bloqueado!* Agora apenas administradores podem enviar mensagens.'
-      : '🔓 *Grupo desbloqueado!* Todos os membros podem enviar mensagens.';
-
-    await sock.sendMessage(jid, { text: mensagemStatus });
-
-        await dbClient.query(
-        `INSERT INTO logs (user_id, alvo_id, comando)
-        VALUES ($1, $2, $3)`,
-        [senderJid, null, `!lock`]
-    );
-  } catch (error) {
-    console.error('Erro no comando !lock:', error);
-    await reply({ text: '❌ Falha ao alterar o estado do grupo.' });
-  }
-  break;
-
-
+    break;
 
 
                     default:
