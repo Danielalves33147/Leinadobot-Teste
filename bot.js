@@ -201,7 +201,7 @@ if (!ignorarBloqueio.includes(lowerCommand)) {
     }
 }
 
-const nomeContador = command.slice(1).toLowerCase();
+/*const nomeContador = command.slice(1).toLowerCase();
 
 try {
     // Verifica se é um contador existente
@@ -218,7 +218,7 @@ try {
     await reply({ text: `❌ Erro ao lidar com contador '${nomeContador}'.` });
     return;
 }
-
+*/
 
                 switch (lowerCommand) {
 case '!help':
@@ -494,6 +494,56 @@ Aproveite o poder do LeinadoBot!`;
     } catch (error) {
         console.error('Erro ao executar !inicio:', error);
         await reply({ text: '❌ Não foi possível exibir a mensagem de boas-vindas.' });
+    }
+    break;
+
+case '!menosuma':
+    try {
+        if (!jid.endsWith('@g.us')) {
+            await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
+            break;
+        }
+
+        const currentCount = await incrementCounter('menos_uma');
+        const mentions = [
+            '557191165170@s.whatsapp.net', // Daniel
+            '557182903278@s.whatsapp.net', // Melky
+            '557199670849@s.whatsapp.net', // Michael
+            '557181984714@s.whatsapp.net', // Marcos
+            '557181766942@s.whatsapp.net'  // Matheus
+        ];
+
+        const texto = `O devorador ataca novamente!\n -1\nVítimas: *${currentCount}*\n\n${mentions.map(id => `@${id.split('@')[0]}`).join(' ')}`;
+        await sock.sendMessage(jid, { text: texto, mentions });
+
+    } catch (err) {
+        console.error('Erro no comando !menosuma:', err);
+        await reply({ text: '❌ Erro ao registrar o ataque do devorador.' });
+    }
+    break;
+
+case '!perdi':
+    try {
+        if (!jid.endsWith('@g.us')) {
+            await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
+            break;
+        }
+
+        const currentCount = await incrementCounter('perdi');
+        const mentions = [
+            '557191165170@s.whatsapp.net', // Daniel
+            '557182903278@s.whatsapp.net', // Melky
+            '557199670849@s.whatsapp.net', // Michael
+            '557181984714@s.whatsapp.net', // Marcos
+            '557181766942@s.whatsapp.net'  // Matheus
+        ];
+
+        const texto = `Perdemos *${currentCount}* vez(es)... 😔\nMarcando: ${mentions.map(id => `@${id.split('@')[0]}`).join(' ')}`;
+        await sock.sendMessage(jid, { text: texto, mentions });
+
+    } catch (err) {
+        console.error('Erro no comando !perdi:', err);
+        await reply({ text: '❌ Erro ao registrar a derrota.' });
     }
     break;
 
@@ -983,33 +1033,34 @@ case '!comandossecretos':
 
 case '!force':
     try {
-        if (nivel !== 0) {
-            await reply({ text: 'Comando não reconhecido.' });
+        if (args.length < 2) {
+            await reply({ text: '⚠️ Use: !force <contador> <valor>' });
             break;
         }
 
-        const [nome, valorStr] = args;
-        const valor = parseInt(valorStr);
+        const nome = args[0].toLowerCase();
+        const valor = parseInt(args[1]);
 
-        if (!nome || isNaN(valor)) {
-            await reply({ text: '❌ Uso correto: !setcounter <contador> <valor>' });
+        if (isNaN(valor) || valor < 0) {
+            await reply({ text: '⚠️ Valor inválido. Use um número inteiro positivo.' });
             break;
         }
 
-        const result = await pool.query(
-            'UPDATE counters SET value = $1, last_update = CURRENT_TIMESTAMP WHERE counter_name = $2 RETURNING value',
+        const existe = await pool.query('SELECT 1 FROM counters WHERE counter_name = $1', [nome]);
+        if (existe.rowCount === 0) {
+            await reply({ text: `⚠️ Contador *${nome}* não existe.` });
+            break;
+        }
+
+        await pool.query(
+            'UPDATE counters SET value = $1, last_update = CURRENT_TIMESTAMP WHERE counter_name = $2',
             [valor, nome]
         );
 
-        if (result.rowCount === 0) {
-            await reply({ text: `❌ Contador '${nome}' não encontrado.` });
-        } else {
-            await reply({ text: `✅ Contador *${nome}* ajustado para ${valor}.` });
-        }
-
+        await reply({ text: `🔧 Contador *${nome}* atualizado para *${valor}*.` });
     } catch (err) {
-        console.error('Erro no comando !setcounter:', err);
-        await reply({ text: '❌ Erro ao ajustar o contador.' });
+        console.error('Erro no comando !force:', err);
+        await reply({ text: '❌ Erro ao forçar valor do contador.' });
     }
     break;
 
@@ -1078,6 +1129,7 @@ case '!att':
   }
   break;
 
+/*
 case '!addcounter':
     try {
         if (args.length < 1) {
@@ -1104,8 +1156,8 @@ case '!addcounter':
         await reply({ text: '❌ Erro ao criar contador.' });
     }
     break;
-
-
+    
+    */
                     default:
                         console.log(`Comando desconhecido: ${command}`);
                         await sock.sendMessage(jid, { text: 'Comando desconhecido. Use !help para ver os comandos disponíveis.' });
