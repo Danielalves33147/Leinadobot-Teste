@@ -989,13 +989,32 @@ case '!lock':
 // Comandos Secretos
 
 case '!comandossecretos':
-    try {
-        if (nivel !== 0) {
-            await reply({ text: 'Comando não reconhecido.' });
-            break;
-        }
+  try {
+    const comandoAtual = '!comandossecretos';
 
-        const textoSecreto = `🕵️‍♂️ *COMANDOS SECRETOS* 🕵️‍♂️
+    const senderRole = await getUserCargoFromDatabase(senderJid);
+    if (!senderRole || senderRole.cargo_id === undefined) {
+      await reply({ text: '❌ Seu cargo não foi encontrado.' });
+      break;
+    }
+
+    const comando = await dbClient.query(
+      'SELECT nivel_minimo FROM comandos WHERE nome = $1 AND ativo = TRUE',
+      [comandoAtual]
+    );
+
+    if (comando.rows.length === 0) {
+      await reply({ text: `⚠️ O comando "${comandoAtual}" não está registrado ou está desativado.` });
+      break;
+    }
+
+    const nivelMinimo = comando.rows[0].nivel_minimo;
+    if (senderRole.cargo_id > nivelMinimo) {
+      await reply({ text: '❌ Você não tem permissão para ver os comandos secretos.' });
+      break;
+    }
+
+    const textoSecreto = `🕵️‍♂️ *COMANDOS SECRETOS* 🕵️‍♂️
 
 🔧 *Ajustes de Contadores*
 !force <contador> <valor> — Define o valor exato de um contador (ex: !force perdi 42)
@@ -1006,12 +1025,18 @@ case '!comandossecretos':
 🛠️ *Manutenção e Testes*
 (Outros comandos ocultos ainda em fase de elaboração...)`;
 
-        await reply({ text: textoSecreto });
-    } catch (err) {
-        console.error('Erro ao exibir comandos secretos:', err);
-        await reply({ text: '❌ Falha ao exibir comandos secretos.' });
-    }
-    break;
+    await reply({ text: textoSecreto });
+
+    await dbClient.query(
+      `INSERT INTO logs (user_id, alvo_id, comando)
+       VALUES ($1, $2, $3)`,
+      [senderJid, null, comandoAtual]
+    );
+  } catch (err) {
+    console.error('Erro no comando !comandossecretos:', err);
+    await reply({ text: '❌ Falha ao exibir comandos secretos.' });
+  }
+  break;
 
 case '!force':
     try {
