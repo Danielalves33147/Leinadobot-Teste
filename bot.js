@@ -1018,6 +1018,7 @@ case '!comandossecretos':
 
 🔧 *Ajustes de Contadores*
 !force <contador> <valor> — Define o valor exato de um contador (ex: !force perdi 42)
+!fazol
 
 📢 *Mensagens Globais*
 !att — Envia uma mensagem para todos os grupos registrados
@@ -1135,6 +1136,40 @@ case '!att':
     await reply({ text: '❌ Falha inesperada ao tentar enviar o aviso.' });
   }
   break;
+
+case '!fazol':
+    try {
+        if (!jid.endsWith('@g.us')) {
+            await reply({ text: '⚠️ Este comando só pode ser usado em grupos.' });
+            break;
+        }
+
+        const currentCount = await incrementCounter('fazol');
+        const mentions = [
+            '557191165170@s.whatsapp.net', // Daniel
+            '557182903278@s.whatsapp.net', // Melky
+            '557199670849@s.whatsapp.net', // Michael
+            '557181984714@s.whatsapp.net', // Marcos
+            '557181766942@s.whatsapp.net'  // Matheus
+        ];
+
+        const frases = [
+        `💥 Mais um L pra conta! Já são *${currentCount}*...`,
+        `🇧🇷 Pensamento socialista detectado. Total de L’s: *${currentCount}*.`,
+        `✊ A revolução avança! Contador de L’s: *${currentCount}*.`,
+        `🧠 O Lula vive nos pensamentos... *${currentCount}* vezes e contando.`,
+        `📈 A cada L, um ministro sorri. Já temos *${currentCount}* registros.`
+      ];
+      const texto = frases[Math.floor(Math.random() * frases.length)] + `\nMarcando: ${mentions.map(id => `@${id.split('@')[0]}`).join(' ')}`;
+
+
+        await sock.sendMessage(jid, { text: texto, mentions });
+
+    } catch (err) {
+        console.error('Erro no comando !fazol:', err);
+        await reply({ text: '❌ Erro ao registrar o L.' });
+    }
+    break;
 
                     default:
                         console.log(`Comando desconhecido: ${command}`);
