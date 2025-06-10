@@ -6,6 +6,7 @@ const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLat
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
+const gruposRegistrados = new Map();
 
 const axios = require('axios');
 
@@ -37,6 +38,17 @@ async function isUserBlocked(userId) {
     const result = await dbClient.query('SELECT is_blocked FROM users WHERE user_id = $1', [userId]);
     return result.rows.length > 0 && result.rows[0].is_blocked;
 }
+
+async function getAllGroupParticipants(groupId) {
+  try {
+    const groupMetadata = await sock.groupMetadata(groupId);
+    return groupMetadata?.participants?.map(p => p.id) || [];
+  } catch (error) {
+    console.error('Erro ao obter participantes do grupo:', error);
+    return [];
+  }
+}
+
 
 // Função para conectar ao banco de dados e testar a tabela 'users'
 async function connectDB() {
@@ -1019,6 +1031,8 @@ case '!comandossecretos':
 🔧 *Ajustes de Contadores*
 !force <contador> <valor> — Define o valor exato de um contador (ex: !force perdi 42)
 !fazol
+!grupos - Lista os Grupos em que o Bot esta
+!mass <comando> <grupo_id> <msg> - Envia um comando para varios grupos ao memsmo tempo
 
 📢 *Mensagens Globais*
 !att — Envia uma mensagem para todos os grupos registrados
@@ -1170,6 +1184,128 @@ case '!fazol':
         await reply({ text: '❌ Erro ao registrar o L.' });
     }
     break;
+
+case '!mass':
+
+const senderRole = await getUserCargoFromDatabase(senderJid);
+if (!senderRole || senderRole.cargo_id > 1) { // 0 = Dono, 1 = Imperador
+  await reply({ text: '🚫 Você não tem permissão para usar esse comando.' });
+  break;
+}
+
+  try {
+    const tipoAcao = args[0]; // msg, lock, leave, ban
+    const indices = args[1]?.split(',').map(n => parseInt(n.trim()));
+    const conteudo = args.slice(2).join(' ');
+
+    if (!tipoAcao || !indices || indices.some(isNaN)) {
+      await reply({ text: '⚠️ Uso: !mass <ação> <1,2,3> <mensagem ou @usuario>' });
+      break;
+    }
+
+    const sucesso = [];
+    const falha = [];
+
+    for (const i of indices) {
+      const gid = gruposRegistrados.get(i);
+      if (!gid) {
+        falha.push(i);
+        continue;
+      }
+
+      try {
+        switch (tipoAcao) {
+          case 'msg':
+            if (!conteudo) {
+              await reply({ text: '⚠️ Mensagem vazia. Use: !mass msg 1,2,3 Olá!' });
+              return;
+            }
+            await sock.sendMessage(gid, { text: conteudo });
+            sucesso.push(i);
+            break;
+
+          case 'lock':
+            const metadata = await sock.groupMetadata(gid);
+            const estadoAtual = metadata.announce;
+            const novoEstado = estadoAtual ? 'not_announcement' : 'announcement';
+            await sock.groupSettingUpdate(gid, novoEstado);
+            sucesso.push(i);
+            break;
+
+          case 'leave':
+            await sock.sendMessage(gid, {
+              text: '🚪 O sistema detectou um longo período de ociosidade...\nPor isso, o bot está se retirando deste grupo. Voltem a interagir para termos motivo para retornar! 👋'
+            });
+            await sock.groupLeave(gid);
+            sucesso.push(i);
+            break;
+
+          case 'ban':
+            const alvoId = conteudo.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+            if (!conteudo || !alvoId.endsWith('@s.whatsapp.net')) {
+              await reply({ text: '⚠️ Use: !mass ban 1,3,4 @numero' });
+              return;
+            }
+
+            const participantes = await getAllGroupParticipants(gid);
+            if (!participantes.includes(alvoId)) {
+              falha.push(i);
+              continue;
+            }
+
+            await sock.groupParticipantsUpdate(gid, [alvoId], 'remove');
+            sucesso.push(i);
+            break;
+
+          default:
+            await reply({ text: `❌ Ação "${tipoAcao}" não reconhecida.` });
+            return;
+        }
+      } catch (err) {
+        console.error(`Erro ao executar ${tipoAcao} em ${gid}:`, err);
+        falha.push(i);
+      }
+    }
+
+    let resultado = `✅ Ação *${tipoAcao}* executada em ${sucesso.length} grupo(s).\n`;
+    if (falha.length) resultado += `⚠️ Falhou em: ${falha.join(', ')}`;
+
+    await reply({ text: resultado.trim() });
+
+    await dbClient.query(`
+      INSERT INTO logs (user_id, alvo_id, comando)
+      VALUES ($1, $2, $3)
+    `, [senderJid, conteudo || null, `!mass ${tipoAcao}`]);
+
+  } catch (err) {
+    console.error('Erro no comando !mass:', err);
+    await reply({ text: '❌ Erro ao executar o comando em massa.' });
+  }
+  break;
+
+const gruposRegistrados = new Map();
+
+case '!grupos':
+  
+  try {
+    const grupos = await sock.groupFetchAllParticipating();
+    let i = 1;
+    gruposRegistrados.clear();
+
+    let mensagem = '📋 *Grupos Disponíveis:*\n\n';
+    for (const [jid, data] of Object.entries(grupos)) {
+      gruposRegistrados.set(i, jid);
+      mensagem += `${i} - ${data.subject}\n`;
+      i++;
+    }
+
+    await reply({ text: mensagem.trim() });
+  } catch (err) {
+    console.error('Erro ao listar grupos:', err);
+    await reply({ text: '❌ Não foi possível listar os grupos.' });
+  }
+  break;
+
 
                     default:
                         console.log(`Comando desconhecido: ${command}`);
