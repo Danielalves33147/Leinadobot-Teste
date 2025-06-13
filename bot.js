@@ -1167,7 +1167,7 @@ Aproveite o poder do LeinadoBot!`;
                       }
 
                       await sock.sendMessage(gid, {
-                        text: `📣 *ATENÇÃO GRUPO!*\nMarcação em massa realizada por ordem superior.`,
+                        text: `📍Chamando todo mundo📍`,
                         mentions
                       });
 
