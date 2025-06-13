@@ -1079,20 +1079,20 @@ Aproveite o poder do LeinadoBot!`;
                 break;
               }
 
-              const tipoAcao = args[0]?.toLowerCase(); // msg, lock, leave, ban, all
-              const segundoArg = args[1]?.toLowerCase();
+              const tipoAcao = args[0]; // msg, lock, leave, ban, all
               const conteudoRaw = args.slice(2).join(' ');
-              const isAll = segundoArg === 'all';
+              const isAll = args[1]?.toLowerCase() === 'all';
 
               const indices = isAll
                 ? Array.from(gruposRegistrados.keys())
-                : segundoArg?.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+                : args[1]?.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 
               if (!tipoAcao || !indices || indices.length === 0) {
                 await reply({ text: '⚠️ Uso: !mass <ação> <1,2,3|all> <mensagem ou @usuario>' });
                 break;
               }
 
+              const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
               const sucesso = [];
               const falha = [];
 
@@ -1148,14 +1148,13 @@ Aproveite o poder do LeinadoBot!`;
                       break;
 
                     case 'all':
-                      const COOLDOWN_MS = 60 * 60 * 1000; // 1 hora
+                      const COOLDOWN_MS = 60 * 60 * 1000;
                       const agora = Date.now();
-
                       if (!global.massAllCooldown) global.massAllCooldown = new Map();
-                      const cooldownGrupo = global.massAllCooldown.get(gid) || 0;
 
+                      const cooldownGrupo = global.massAllCooldown.get(gid) || 0;
                       if (agora - cooldownGrupo < COOLDOWN_MS) {
-                        falha.push(i); // Cooldown ativo
+                        falha.push(i);
                         continue;
                       }
 
@@ -1186,7 +1185,7 @@ Aproveite o poder do LeinadoBot!`;
                 }
               }
 
-              let resultado = `✅ Ação *${tipoAcao}* executada em ${sucesso.length} grupo(s).`;
+              let resultado = `✅ Ação *${tipoAcao}* executada com sucesso em ${sucesso.length} grupo(s).`;
               if (falha.length) resultado += `\n⚠️ Falhou em: ${falha.join(', ')}`;
 
               await reply({ text: resultado.trim() });
