@@ -1079,13 +1079,14 @@ Aproveite o poder do LeinadoBot!`;
                 break;
               }
 
-              const tipoAcao = args[0]; // msg, lock, leave, ban
+              const tipoAcao = args[0]?.toLowerCase(); // msg, lock, leave, ban, all
+              const segundoArg = args[1]?.toLowerCase();
               const conteudoRaw = args.slice(2).join(' ');
-              const isAll = args[1]?.toLowerCase() === 'all';
+              const isAll = segundoArg === 'all';
 
               const indices = isAll
                 ? Array.from(gruposRegistrados.keys())
-                : args[1]?.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+                : segundoArg?.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 
               if (!tipoAcao || !indices || indices.length === 0) {
                 await reply({ text: '⚠️ Uso: !mass <ação> <1,2,3|all> <mensagem ou @usuario>' });
@@ -1146,6 +1147,35 @@ Aproveite o poder do LeinadoBot!`;
                       sucesso.push(i);
                       break;
 
+                    case 'all':
+                      const COOLDOWN_MS = 60 * 60 * 1000; // 1 hora
+                      const agora = Date.now();
+
+                      if (!global.massAllCooldown) global.massAllCooldown = new Map();
+                      const cooldownGrupo = global.massAllCooldown.get(gid) || 0;
+
+                      if (agora - cooldownGrupo < COOLDOWN_MS) {
+                        falha.push(i); // Cooldown ativo
+                        continue;
+                      }
+
+                      const membros = await getAllGroupParticipants(gid);
+                      const mentions = membros.filter(id => id !== botNumber);
+
+                      if (mentions.length === 0) {
+                        falha.push(i);
+                        continue;
+                      }
+
+                      await sock.sendMessage(gid, {
+                        text: `📣 *ATENÇÃO GRUPO!*\nMarcação em massa realizada por ordem superior.`,
+                        mentions
+                      });
+
+                      global.massAllCooldown.set(gid, agora);
+                      sucesso.push(i);
+                      break;
+
                     default:
                       await reply({ text: `❌ Ação "${tipoAcao}" não reconhecida.` });
                       return;
@@ -1156,7 +1186,7 @@ Aproveite o poder do LeinadoBot!`;
                 }
               }
 
-              let resultado = `✅ Ação *${tipoAcao}* executada com sucesso em ${sucesso.length} grupo(s).`;
+              let resultado = `✅ Ação *${tipoAcao}* executada em ${sucesso.length} grupo(s).`;
               if (falha.length) resultado += `\n⚠️ Falhou em: ${falha.join(', ')}`;
 
               await reply({ text: resultado.trim() });
